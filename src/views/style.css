@@ -1,0 +1,30 @@
+/* Estilos globais */
+body {
+    font-family: 'Arial', sans-serif;
+}
+
+/* Estilo para o card */
+.card {
+    border-radius: 10px;
+}
+
+/* Estilo para a tabela */
+.table {
+    margin-top: 20px;
+}
+
+.table th, .table td {
+    vertical-align: middle;
+}
+
+/* Botões */
+.btn {
+    font-weight: bold;
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+    .card {
+        margin: 10px;
+    }
+}
