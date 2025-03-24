@@ -1,28 +1,33 @@
 const { Pool } = require('pg');
 
-// Configuração do banco de dados PostgreSQL
+/**
+ * Configuração do pool de conexão com o PostgreSQL.
+ */
+
 const pool = new Pool({
-    connectionString: process.env.DATABASE_URL, // String de conexão do Render
-    ssl: {
-        rejectUnauthorized: false // Necessário para conexão com o Render
-    }
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false }
 });
 
-// Função para criar a tabela de registros
+/**
+ * Cria a tabela de registros com campos para controle de almoço.
+ */
 const criarTabela = async () => {
     const query = `
         CREATE TABLE IF NOT EXISTS registros (
             id SERIAL PRIMARY KEY,
             funcionario TEXT NOT NULL,
             entrada TIMESTAMP NOT NULL,
-            saida TIMESTAMP
+            saida_almoco TIMESTAMP,
+            retorno_almoco TIMESTAMP,
+            saida_final TIMESTAMP
         )
     `;
     await pool.query(query);
-    console.log('Tabela de registros criada ou já existente.');
+    console.log('[DB] Tabela de registros verificada/criada.');
 };
 
-// Executar a criação da tabela ao iniciar
+// Executa a criação da tabela ao iniciar
 criarTabela();
 
 module.exports = pool;

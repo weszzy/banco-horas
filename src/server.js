@@ -5,14 +5,14 @@ const registroRoutes = require('./routes/registroRoutes');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware para servir arquivos estáticos
+// Middlewares
+app.use(express.json());
 app.use(express.static(path.join(__dirname, 'views')));
-app.use(express.json()); // Para processar JSON no corpo das requisições
 
-// Rotas da API
+// Rotas
 app.use('/api', registroRoutes);
 
-// Iniciar o servidor
+// Inicia o servidor
 app.listen(PORT, () => {
-    console.log(`Servidor rodando na porta ${PORT}`);
+    console.log(`[Server] Rodando na porta ${PORT}`);
 });

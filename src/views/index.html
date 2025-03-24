@@ -6,103 +6,48 @@
     <title>Banco de Horas</title>
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- Font Awesome para ícones -->
+    <!-- Font Awesome -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
-    <!-- Estilos personalizados -->
+    <!-- CSS Personalizado -->
     <link rel="stylesheet" href="/style.css">
 </head>
 <body class="bg-light">
     <div class="container my-5">
-        <div class="card shadow-lg border-0">
-            <div class="card-header bg-gradient-primary text-white text-center py-4">
-                <h1 class="card-title display-4"><i class="fas fa-clock me-2"></i>Banco de Horas</h1>
+        <div class="card shadow-lg">
+            <div class="card-header bg-primary text-white text-center py-4">
+                <h1 class="display-5"><i class="fas fa-clock me-2"></i>Banco de Horas</h1>
             </div>
             <div class="card-body p-4">
-                <!-- Formulário de registro -->
+                <!-- Formulário de Registro -->
                 <form id="registroForm" class="mb-4">
                     <div class="mb-3">
-                        <label for="funcionario" class="form-label text-secondary">Funcionário:</label>
-                        <input type="text" id="funcionario" class="form-control form-control-lg" placeholder="Digite o nome do funcionário" required>
+                        <label for="funcionario" class="form-label">Funcionário:</label>
+                        <input type="text" id="funcionario" class="form-control" required>
                     </div>
                     <div class="d-grid gap-2">
-                        <button type="button" class="btn btn-primary btn-lg" onclick="registrarEntrada()">
-                            <i class="fas fa-sign-in-alt me-2"></i>Registrar Entrada
+                        <button type="button" class="btn btn-success" onclick="registrarEntrada()">
+                            <i class="fas fa-sign-in-alt me-2"></i>Entrada
                         </button>
-                        <button type="button" class="btn btn-danger btn-lg" onclick="registrarSaida()">
-                            <i class="fas fa-sign-out-alt me-2"></i>Registrar Saída
+                        <button type="button" class="btn btn-warning" onclick="registrarSaidaAlmoco()">
+                            <i class="fas fa-utensils me-2"></i>Saída Almoço
+                        </button>
+                        <button type="button" class="btn btn-info" onclick="registrarRetornoAlmoco()">
+                            <i class="fas fa-undo me-2"></i>Retorno Almoço
+                        </button>
+                        <button type="button" class="btn btn-danger" onclick="registrarSaidaFinal()">
+                            <i class="fas fa-sign-out-alt me-2"></i>Saída Final
                         </button>
                     </div>
                 </form>
 
-                <!-- Tabela de registros -->
-                <h2 class="text-center mb-4 text-primary"><i class="fas fa-list me-2"></i>Registros</h2>
-                <div class="table-responsive">
-                    <table class="table table-hover align-middle">
-                        <thead class="table-light">
-                            <tr>
-                                <th scope="col">Funcionário</th>
-                                <th scope="col">Entrada</th>
-                                <th scope="col">Saída</th>
-                            </tr>
-                        </thead>
-                        <tbody id="registrosTableBody">
-                            <!-- Registros serão inseridos aqui via JavaScript -->
-                        </tbody>
-                    </table>
-                </div>
+                <!-- Perfil do Funcionário -->
+                <div id="perfilContainer"></div>
             </div>
         </div>
     </div>
 
-    <!-- Bootstrap JS e dependências -->
-    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.6/dist/umd/popper.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.min.js"></script>
-    <!-- Scripts personalizados -->
-    <script>
-        // Função para registrar entrada
-        async function registrarEntrada() {
-            const funcionario = document.getElementById('funcionario').value;
-            const response = await fetch('/api/entrada', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ funcionario })
-            });
-            if (response.ok) {
-                alert('Entrada registrada!');
-                carregarRegistros();
-            }
-        }
-
-        // Função para registrar saída
-        async function registrarSaida() {
-            const funcionario = document.getElementById('funcionario').value;
-            const response = await fetch('/api/saida', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ funcionario })
-            });
-            if (response.ok) {
-                alert('Saída registrada!');
-                carregarRegistros();
-            }
-        }
-
-        // Função para carregar registros
-        async function carregarRegistros() {
-            const response = await fetch('/api/registros');
-            const registros = await response.json();
-            const tbody = document.getElementById('registrosTableBody');
-            tbody.innerHTML = registros.map(reg => `
-                <tr>
-                    <td>${reg.funcionario}</td>
-                    <td>${new Date(reg.entrada).toLocaleString()}</td>
-                    <td>${reg.saida ? new Date(reg.saida).toLocaleString() : 'Em andamento'}</td>
-                </tr>
-            `).join('');
-        }
-
-        // Carregar registros ao abrir a página
-        carregarRegistros();
-    </script>
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/script.js"></script>
 </body>
 </html>

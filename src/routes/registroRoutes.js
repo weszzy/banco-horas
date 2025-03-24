@@ -1,15 +1,17 @@
 const express = require('express');
-const { registrarEntrada, registrarSaida, listarRegistros } = require('../controllers/registroController');
+const {
+    registrarEntrada,
+    registrarSaidaAlmoco,
+    registrarRetornoAlmoco,
+    registrarSaidaFinal
+} = require('../controllers/registroController');
 
 const router = express.Router();
 
-// Rota para registrar entrada
+// Rotas para registro de ponto
 router.post('/entrada', registrarEntrada);
-
-// Rota para registrar saída
-router.post('/saida', registrarSaida);
-
-// Rota para listar registros
-router.get('/registros', listarRegistros);
+router.post('/saida-almoco', registrarSaidaAlmoco);
+router.post('/retorno-almoco', registrarRetornoAlmoco);
+router.post('/saida-final', registrarSaidaFinal);
 
 module.exports = router;
