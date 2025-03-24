@@ -96,6 +96,40 @@ const calcularHorasTrabalhadas = (registro) => {
     return (horasTotais - horasAlmoco).toFixed(2);
 };
 
+/**
+ * Obtém o registro mais recente de cada funcionário
+ */
+const listarRegistrosRecentes = async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT DISTINCT ON (funcionario) *
+            FROM registros
+            ORDER BY funcionario, entrada DESC
+        `);
+        res.status(200).json(result.rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+};
+
+/**
+ * Obtém todos os registros de um funcionário específico
+ */
+const listarHistoricoFuncionario = async (req, res) => {
+    const { funcionario } = req.params;
+    try {
+        const result = await pool.query(
+            `SELECT * FROM registros 
+             WHERE funcionario = $1 
+             ORDER BY entrada DESC`,
+            [funcionario]
+        );
+        res.status(200).json(result.rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+};
+
 module.exports = {
     registrarEntrada,
     registrarSaidaAlmoco,

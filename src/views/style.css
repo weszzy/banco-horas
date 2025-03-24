@@ -65,6 +65,25 @@ body {
     background-color: rgba(108, 99, 255, 0.1);
 }
 
+/* Estilos para os cards de registro */
+#registrosContainer .card {
+    transition: transform 0.2s;
+}
+
+#registrosContainer .card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+/* Estilos para a tabela no modal */
+.modal-body table {
+    width: 100%;
+}
+
+.modal-body th {
+    background-color: #f8f9fa;
+}
+
 /* Responsividade */
 @media (max-width: 768px) {
     .card {
