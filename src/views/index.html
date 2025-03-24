@@ -6,37 +6,43 @@
     <title>Banco de Horas</title>
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome para ícones -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
     <!-- Estilos personalizados -->
     <link rel="stylesheet" href="/style.css">
 </head>
 <body class="bg-light">
-    <div class="container mt-5">
-        <div class="card shadow">
-            <div class="card-header bg-primary text-white">
-                <h1 class="card-title text-center">Banco de Horas</h1>
+    <div class="container my-5">
+        <div class="card shadow-lg border-0">
+            <div class="card-header bg-gradient-primary text-white text-center py-4">
+                <h1 class="card-title display-4"><i class="fas fa-clock me-2"></i>Banco de Horas</h1>
             </div>
-            <div class="card-body">
+            <div class="card-body p-4">
                 <!-- Formulário de registro -->
                 <form id="registroForm" class="mb-4">
                     <div class="mb-3">
-                        <label for="funcionario" class="form-label">Funcionário:</label>
-                        <input type="text" id="funcionario" class="form-control" required>
+                        <label for="funcionario" class="form-label text-secondary">Funcionário:</label>
+                        <input type="text" id="funcionario" class="form-control form-control-lg" placeholder="Digite o nome do funcionário" required>
                     </div>
                     <div class="d-grid gap-2">
-                        <button type="button" class="btn btn-success" onclick="registrarEntrada()">Registrar Entrada</button>
-                        <button type="button" class="btn btn-danger" onclick="registrarSaida()">Registrar Saída</button>
+                        <button type="button" class="btn btn-primary btn-lg" onclick="registrarEntrada()">
+                            <i class="fas fa-sign-in-alt me-2"></i>Registrar Entrada
+                        </button>
+                        <button type="button" class="btn btn-danger btn-lg" onclick="registrarSaida()">
+                            <i class="fas fa-sign-out-alt me-2"></i>Registrar Saída
+                        </button>
                     </div>
                 </form>
 
                 <!-- Tabela de registros -->
-                <h2 class="text-center mb-3">Registros</h2>
+                <h2 class="text-center mb-4 text-primary"><i class="fas fa-list me-2"></i>Registros</h2>
                 <div class="table-responsive">
-                    <table class="table table-striped table-hover">
-                        <thead>
+                    <table class="table table-hover align-middle">
+                        <thead class="table-light">
                             <tr>
-                                <th>Funcionário</th>
-                                <th>Entrada</th>
-                                <th>Saída</th>
+                                <th scope="col">Funcionário</th>
+                                <th scope="col">Entrada</th>
+                                <th scope="col">Saída</th>
                             </tr>
                         </thead>
                         <tbody id="registrosTableBody">
