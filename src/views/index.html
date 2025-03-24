@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Banco de Horas</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th,
+        td {
+            border: 1px solid #ddd;
+            padding: 8px;
+        }
+
+        th {
+            background-color: #f2f2f2;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Banco de Horas</h1>
+    <form id="registroForm">
+        <label for="funcionario">Funcionário:</label>
+        <input type="text" id="funcionario" name="funcionario" required>
+        <button type="button" onclick="registrarEntrada()">Registrar Entrada</button>
+        <button type="button" onclick="registrarSaida()">Registrar Saída</button>
+    </form>
+    <h2>Registros</h2>
+    <table id="registrosTable">
+        <thead>
+            <tr>
+                <th>Funcionário</th>
+                <th>Entrada</th>
+                <th>Saída</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+
+    <script>
+        // Função para registrar entrada
+        async function registrarEntrada() {
+            const funcionario = document.getElementById('funcionario').value;
+            const response = await fetch('/api/entrada', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ funcionario })
+            });
+            if (response.ok) {
+                alert('Entrada registrada!');
+                carregarRegistros();
+            }
+        }
+
+        // Função para registrar saída
+        async function registrarSaida() {
+            const funcionario = document.getElementById('funcionario').value;
+            const response = await fetch('/api/saida', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ funcionario })
+            });
+            if (response.ok) {
+                alert('Saída registrada!');
+                carregarRegistros();
+            }
+        }
+
+        // Função para carregar registros
+        async function carregarRegistros() {
+            const response = await fetch('/api/registros');
+            const registros = await response.json();
+            const tbody = document.querySelector('#registrosTable tbody');
+            tbody.innerHTML = registros.map(reg => `
+                <tr>
+                    <td>${reg.funcionario}</td>
+                    <td>${new Date(reg.entrada).toLocaleString()}</td>
+                    <td>${reg.saida ? new Date(reg.saida).toLocaleString() : 'Em andamento'}</td>
+                </tr>
+            `).join('');
+        }
+
+        // Carregar registros ao abrir a página
+        carregarRegistros();
+    </script>
+</body>
+
+</html>
