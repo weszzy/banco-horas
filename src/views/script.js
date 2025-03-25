@@ -1,58 +1,61 @@
 /**
- * Funções para interação com a API.
+ * Funções para interação com a API
  */
 
 // Registra entrada
 async function registrarEntrada() {
     const funcionario = document.getElementById('funcionario').value;
-    const response = await fetch('/api/entrada', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ funcionario })
-    });
-    if (response.ok) {
-        alert('Entrada registrada!');
-        carregarPerfil(funcionario);
+    if (!funcionario) {
+        alert('Por favor, insira o nome do funcionário');
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/entrada', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ funcionario })
+        });
+        
+        if (response.ok) {
+            alert('Entrada registrada com sucesso!');
+            carregarRegistrosRecentes();
+        } else {
+            throw new Error('Erro ao registrar entrada');
+        }
+    } catch (err) {
+        console.error('Erro:', err);
+        alert('Falha ao registrar entrada');
     }
 }
 
-// Registra saída para almoço
-async function registrarSaidaAlmoco() {
-    const funcionario = document.getElementById('funcionario').value;
-    const response = await fetch('/api/saida-almoco', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ funcionario })
-    });
-    if (response.ok) {
-        alert('Saída para almoço registrada!');
-        carregarPerfil(funcionario);
-    }
-}
-
-/**
- * Carrega os registros mais recentes de todos os funcionários
- */
+// Carrega registros recentes
 async function carregarRegistrosRecentes() {
     try {
         const response = await fetch('/api/registros/recentes');
         const registros = await response.json();
-
+        
         const container = document.getElementById('registrosContainer');
         container.innerHTML = registros.map(reg => `
-            <div class="card mb-3">
-                <div class="card-header">
-                    <h5>${reg.funcionario}</h5>
-                </div>
-                <div class="card-body">
-                    <p>Última entrada: ${new Date(reg.entrada).toLocaleString()}</p>
-                    ${reg.saida_final ?
-                `<p>Última saída: ${new Date(reg.saida_final).toLocaleString()}</p>` :
-                '<p class="text-warning">Ainda no trabalho</p>'
-            }
-                    <button class="btn btn-sm btn-primary" onclick="abrirHistorico('${reg.funcionario}')">
-                        Ver histórico completo
-                    </button>
+            <div class="col-md-6 col-lg-4">
+                <div class="card h-100">
+                    <div class="card-header">
+                        <h5>${reg.funcionario}</h5>
+                    </div>
+                    <div class="card-body">
+                        <p><strong>Entrada:</strong> ${formatarData(reg.entrada)}</p>
+                        ${reg.saida_almoco ? `<p><strong>Saída Almoço:</strong> ${formatarData(reg.saida_almoco)}</p>` : ''}
+                        ${reg.retorno_almoco ? `<p><strong>Retorno Almoço:</strong> ${formatarData(reg.retorno_almoco)}</p>` : ''}
+                        ${reg.saida_final ? 
+                            `<p><strong>Saída Final:</strong> ${formatarData(reg.saida_final)}</p>` : 
+                            '<p class="text-warning"><strong>Status:</strong> Em trabalho</p>'
+                        }
+                    </div>
+                    <div class="card-footer">
+                        <button class="btn btn-sm btn-primary" onclick="abrirHistorico('${reg.funcionario}')">
+                            <i class="fas fa-history me-1"></i>Ver Histórico
+                        </button>
+                    </div>
                 </div>
             </div>
         `).join('');
@@ -61,80 +64,47 @@ async function carregarRegistrosRecentes() {
     }
 }
 
-/**
- * Abre o histórico completo de um funcionário
- */
+// Abre modal com histórico completo
 async function abrirHistorico(funcionario) {
     try {
         const response = await fetch(`/api/historico/${funcionario}`);
         const historico = await response.json();
-
-        const modalHTML = `
-            <div class="modal fade" id="historicoModal" tabindex="-1">
-                <div class="modal-dialog">
-                    <div class="modal-content">
-                        <div class="modal-header">
-                            <h5 class="modal-title">Histórico de ${funcionario}</h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                        </div>
-                        <div class="modal-body">
-                            <table class="table">
-                                <thead>
-                                    <tr>
-                                        <th>Data</th>
-                                        <th>Entrada</th>
-                                        <th>Saída</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${historico.map(reg => `
-                                        <tr>
-                                            <td>${new Date(reg.entrada).toLocaleDateString()}</td>
-                                            <td>${new Date(reg.entrada).toLocaleTimeString()}</td>
-                                            <td>${reg.saida_final ? new Date(reg.saida_final).toLocaleTimeString() : '-'}</td>
-                                        </tr>
-                                    `).join('')}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-
-        // Adiciona o modal ao DOM e exibe
-        document.body.insertAdjacentHTML('beforeend', modalHTML);
+        
+        document.getElementById('historicoModalLabel').textContent = `Histórico de ${funcionario}`;
+        
+        const tbody = document.getElementById('historicoBody');
+        tbody.innerHTML = historico.map(reg => `
+            <tr>
+                <td>${formatarData(reg.entrada, true)}</td>
+                <td>${formatarHora(reg.entrada)}</td>
+                <td>${reg.saida_almoco ? formatarHora(reg.saida_almoco) : '-'}</td>
+                <td>${reg.retorno_almoco ? formatarHora(reg.retorno_almoco) : '-'}</td>
+                <td>${reg.saida_final ? formatarHora(reg.saida_final) : '-'}</td>
+            </tr>
+        `).join('');
+        
+        // Mostra o modal
         const modal = new bootstrap.Modal(document.getElementById('historicoModal'));
         modal.show();
-
-        // Remove o modal quando fechado
-        document.getElementById('historicoModal').addEventListener('hidden.bs.modal', () => {
-            document.getElementById('historicoModal').remove();
-        });
     } catch (err) {
         console.error('Erro ao carregar histórico:', err);
+        alert('Falha ao carregar histórico');
     }
 }
 
-// Carrega os registros quando a página é aberta
-document.addEventListener('DOMContentLoaded', carregarRegistrosRecentes);
-
-// Carrega o perfil do funcionário
-async function carregarPerfil(funcionario) {
-    const response = await fetch(`/api/registros?funcionario=${funcionario}`);
-    const registro = await response.json();
-    const perfilHTML = `
-        <div class="card mt-4">
-            <div class="card-header">
-                <h5>${funcionario}</h5>
-            </div>
-            <div class="card-body">
-                <p>Entrada: ${registro.entrada}</p>
-                <p>Saída Almoço: ${registro.saida_almoco || '--'}</p>
-                <p>Retorno Almoço: ${registro.retorno_almoco || '--'}</p>
-                <p>Saída Final: ${registro.saida_final || '--'}</p>
-            </div>
-        </div>
-    `;
-    document.getElementById('perfilContainer').innerHTML = perfilHTML;
+// Funções auxiliares
+function formatarData(dataString, apenasData = false) {
+    const data = new Date(dataString);
+    if (apenasData) {
+        return data.toLocaleDateString('pt-BR');
+    }
+    return data.toLocaleString('pt-BR');
 }
+
+function formatarHora(dataString) {
+    const data = new Date(dataString);
+    return data.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+}
+
+// Carrega registros quando a página é aberta
+document.addEventListener('DOMContentLoaded', carregarRegistrosRecentes);

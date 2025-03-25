@@ -1,7 +1,9 @@
 const pool = require('../models/registroModel');
 
 /**
- * Registra a entrada de um funcionário.
+ * Registra a entrada de um funcionário
+ * @param {Object} req - Request object
+ * @param {Object} res - Response object
  */
 const registrarEntrada = async (req, res) => {
     const { funcionario } = req.body;
@@ -17,7 +19,9 @@ const registrarEntrada = async (req, res) => {
 };
 
 /**
- * Registra a saída para o almoço.
+ * Registra saída para almoço
+ * @param {Object} req - Request object
+ * @param {Object} res - Response object
  */
 const registrarSaidaAlmoco = async (req, res) => {
     const { funcionario } = req.body;
@@ -36,7 +40,9 @@ const registrarSaidaAlmoco = async (req, res) => {
 };
 
 /**
- * Registra o retorno do almoço.
+ * Registra retorno do almoço
+ * @param {Object} req - Request object
+ * @param {Object} res - Response object
  */
 const registrarRetornoAlmoco = async (req, res) => {
     const { funcionario } = req.body;
@@ -55,7 +61,9 @@ const registrarRetornoAlmoco = async (req, res) => {
 };
 
 /**
- * Registra a saída final do dia.
+ * Registra saída final
+ * @param {Object} req - Request object
+ * @param {Object} res - Response object
  */
 const registrarSaidaFinal = async (req, res) => {
     const { funcionario } = req.body;
@@ -74,30 +82,9 @@ const registrarSaidaFinal = async (req, res) => {
 };
 
 /**
- * Calcula horas trabalhadas com desconto do almoço.
- */
-const calcularHorasTrabalhadas = (registro) => {
-    if (!registro.saida_final || !registro.saida_almoco || !registro.retorno_almoco) {
-        return 0; // Dados incompletos
-    }
-
-    const entrada = new Date(registro.entrada);
-    const saidaFinal = new Date(registro.saida_final);
-    const saidaAlmoco = new Date(registro.saida_almoco);
-    const retornoAlmoco = new Date(registro.retorno_almoco);
-
-    // Horas totais no trabalho (em horas)
-    const horasTotais = (saidaFinal - entrada) / (1000 * 60 * 60);
-
-    // Tempo de almoço (em horas)
-    const horasAlmoco = (retornoAlmoco - saidaAlmoco) / (1000 * 60 * 60);
-
-    // Horas trabalhadas efetivas
-    return (horasTotais - horasAlmoco).toFixed(2);
-};
-
-/**
- * Obtém o registro mais recente de cada funcionário
+ * Lista registros recentes (último de cada funcionário)
+ * @param {Object} req - Request object
+ * @param {Object} res - Response object
  */
 const listarRegistrosRecentes = async (req, res) => {
     try {
@@ -113,7 +100,9 @@ const listarRegistrosRecentes = async (req, res) => {
 };
 
 /**
- * Obtém todos os registros de um funcionário específico
+ * Lista histórico completo de um funcionário
+ * @param {Object} req - Request object
+ * @param {Object} res - Response object
  */
 const listarHistoricoFuncionario = async (req, res) => {
     const { funcionario } = req.params;
@@ -135,5 +124,6 @@ module.exports = {
     registrarSaidaAlmoco,
     registrarRetornoAlmoco,
     registrarSaidaFinal,
-    calcularHorasTrabalhadas
+    listarRegistrosRecentes,
+    listarHistoricoFuncionario
 };

@@ -1,4 +1,5 @@
 const express = require('express');
+const router = express.Router();
 const {
     registrarEntrada,
     registrarSaidaAlmoco,
@@ -7,8 +8,6 @@ const {
     listarRegistrosRecentes,
     listarHistoricoFuncionario
 } = require('../controllers/registroController');
-
-const router = express.Router();
 
 // Rotas de registro
 router.post('/entrada', registrarEntrada);

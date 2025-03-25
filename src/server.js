@@ -12,7 +12,12 @@ app.use(express.static(path.join(__dirname, 'views')));
 // Rotas
 app.use('/api', registroRoutes);
 
+// Rota padrão para o frontend
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'views', 'index.html'));
+});
+
 // Inicia o servidor
 app.listen(PORT, () => {
-    console.log(`[Server] Rodando na porta ${PORT}`);
+    console.log(`[Server] Online na porta ${PORT}`);
 });
