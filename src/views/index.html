@@ -1,87 +1,106 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Banco de Horas</title>
-    <!-- Bootstrap 5 -->
+    <title>Controle de Ponto | Empresa XYZ</title>
+
+    <!-- CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- Font Awesome -->
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
-    <!-- CSS Personalizado -->
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet">
     <link rel="stylesheet" href="/style.css">
 </head>
+
 <body>
-    <div class="container py-4">
-        <div class="card shadow">
-            <div class="card-header bg-primary text-white">
-                <h1 class="text-center"><i class="fas fa-clock me-2"></i>Banco de Horas</h1>
-            </div>
-            <div class="card-body">
-                <!-- Formulário de Registro -->
-                <div class="mb-4 p-3 border rounded">
-                    <h3 class="mb-3">Registrar Ponto</h3>
-                    <div class="mb-3">
-                        <label for="funcionario" class="form-label">Nome do Funcionário</label>
-                        <input type="text" id="funcionario" class="form-control" required>
+    <div class="container-fluid">
+        <div class="row min-vh-100">
+            <!-- Sidebar -->
+            <nav class="col-md-3 col-lg-2 bg-dark sidebar">
+                <div class="position-sticky pt-3">
+                    <div class="text-center mb-4">
+                        <img src="/assets/company-logo.png" alt="Logo" class="img-fluid" width="120">
                     </div>
-                    <div class="d-grid gap-2">
-                        <button class="btn btn-success" onclick="registrarEntrada()">
-                            <i class="fas fa-sign-in-alt me-2"></i>Entrada
-                        </button>
-                        <button class="btn btn-warning" onclick="registrarSaidaAlmoco()">
-                            <i class="fas fa-utensils me-2"></i>Saída Almoço
-                        </button>
-                        <button class="btn btn-info" onclick="registrarRetornoAlmoco()">
-                            <i class="fas fa-undo me-2"></i>Retorno Almoço
-                        </button>
-                        <button class="btn btn-danger" onclick="registrarSaidaFinal()">
-                            <i class="fas fa-sign-out-alt me-2"></i>Saída Final
-                        </button>
+                    <ul class="nav flex-column">
+                        <li class="nav-item">
+                            <a class="nav-link active" href="#">
+                                <i class="fas fa-clock me-2"></i>Registrar Ponto
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#">
+                                <i class="fas fa-users me-2"></i>Funcionários
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </nav>
+
+            <!-- Main Content -->
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-4">
+                <h1 class="h2 mb-4">Registro de Ponto</h1>
+
+                <!-- Card de Registro -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-fingerprint me-2"></i>Registrar
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="registroForm">
+                            <div class="mb-3">
+                                <label for="funcionarioSelect" class="form-label">Selecione o Funcionário</label>
+                                <select id="funcionarioSelect" class="form-select select2">
+                                    <option></option> <!-- Placeholder -->
+                                </select>
+                            </div>
+
+                            <div class="d-grid gap-2">
+                                <button type="button" id="btnEntrada" class="btn btn-success">
+                                    <i class="fas fa-sign-in-alt me-2"></i>Registrar Entrada
+                                </button>
+                                <div class="btn-group">
+                                    <button type="button" id="btnSaidaAlmoco" class="btn btn-warning" disabled>
+                                        <i class="fas fa-utensils me-2"></i>Saída Almoço
+                                    </button>
+                                    <button type="button" id="btnRetornoAlmoco" class="btn btn-info" disabled>
+                                        <i class="fas fa-undo me-2"></i>Retorno Almoço
+                                    </button>
+                                </div>
+                                <button type="button" id="btnSaida" class="btn btn-danger" disabled>
+                                    <i class="fas fa-sign-out-alt me-2"></i>Saída Final
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </div>
 
-                <!-- Seção de Registros Recentes -->
-                <div class="mt-4">
-                    <h3 class="mb-3">Registros Recentes</h3>
-                    <div id="registrosContainer" class="row g-3">
-                        <!-- Dinamicamente preenchido por JavaScript -->
+                <!-- Card de Status -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Meu Status Hoje</h5>
+                    </div>
+                    <div class="card-body" id="statusContainer">
+                        <div class="text-center py-5">
+                            <p class="text-muted">Selecione um funcionário para visualizar o status</p>
+                        </div>
                     </div>
                 </div>
-            </div>
+            </main>
         </div>
     </div>
 
-    <!-- Modal para Histórico -->
-    <div class="modal fade" id="historicoModal" tabindex="-1">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="historicoModalLabel">Histórico Completo</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <table class="table table-striped">
-                        <thead>
-                            <tr>
-                                <th>Data</th>
-                                <th>Entrada</th>
-                                <th>Saída Almoço</th>
-                                <th>Retorno Almoço</th>
-                                <th>Saída Final</th>
-                            </tr>
-                        </thead>
-                        <tbody id="historicoBody">
-                            <!-- Preenchido dinamicamente -->
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
+    <!-- Modal de Perfil -->
+    <div class="modal fade" id="perfilModal" tabindex="-1">
+        <!-- Conteúdo do modal -->
     </div>
 
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/js/all.min.js"></script>
     <script src="/script.js"></script>
 </body>
+
 </html>

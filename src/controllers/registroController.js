@@ -1,129 +1,57 @@
-const pool = require('../models/registroModel');
+const { Pool } = require('pg');
+require('dotenv').config();
 
 /**
- * Registra a entrada de um funcionário
- * @param {Object} req - Request object
- * @param {Object} res - Response object
+ * Configuração do pool de conexões com PostgreSQL
+ * @type {Pool}
  */
-const registrarEntrada = async (req, res) => {
-    const { funcionario } = req.body;
-    try {
-        const result = await pool.query(
-            'INSERT INTO registros (funcionario, entrada) VALUES ($1, NOW()) RETURNING *',
-            [funcionario]
-        );
-        res.status(201).json(result.rows[0]);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-};
+const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+});
 
 /**
- * Registra saída para almoço
- * @param {Object} req - Request object
- * @param {Object} res - Response object
+ * Inicializa o banco de dados criando as tabelas necessárias
  */
-const registrarSaidaAlmoco = async (req, res) => {
-    const { funcionario } = req.body;
+const initDB = async () => {
     try {
-        const result = await pool.query(
-            `UPDATE registros 
-             SET saida_almoco = NOW() 
-             WHERE funcionario = $1 AND saida_final IS NULL
-             RETURNING *`,
-            [funcionario]
-        );
-        res.status(200).json(result.rows[0]);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-};
+        // Tabela de funcionários
+        await pool.query(`
+      CREATE TABLE IF NOT EXISTS funcionarios (
+        id SERIAL PRIMARY KEY,
+        nome TEXT NOT NULL UNIQUE,
+        cargo TEXT NOT NULL DEFAULT 'Colaborador',
+        foto_url TEXT DEFAULT '/assets/default-avatar.jpg',
+        horas_semanais DECIMAL(10,2) NOT NULL DEFAULT 44.0,
+        data_cadastro TIMESTAMP NOT NULL DEFAULT NOW()
+      )
+    `);
 
-/**
- * Registra retorno do almoço
- * @param {Object} req - Request object
- * @param {Object} res - Response object
- */
-const registrarRetornoAlmoco = async (req, res) => {
-    const { funcionario } = req.body;
-    try {
-        const result = await pool.query(
-            `UPDATE registros 
-             SET retorno_almoco = NOW() 
-             WHERE funcionario = $1 AND saida_final IS NULL
-             RETURNING *`,
-            [funcionario]
-        );
-        res.status(200).json(result.rows[0]);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-};
+        // Tabela de registros
+        await pool.query(`
+      CREATE TABLE IF NOT EXISTS registros (
+        id SERIAL PRIMARY KEY,
+        funcionario_id INTEGER NOT NULL REFERENCES funcionarios(id),
+        entrada TIMESTAMP NOT NULL,
+        saida_almoco TIMESTAMP,
+        retorno_almoco TIMESTAMP,
+        saida_final TIMESTAMP,
+        horas_trabalhadas DECIMAL(10,2),
+        CONSTRAINT registro_completo CHECK (
+          (saida_final IS NULL) OR 
+          (saida_almoco IS NOT NULL AND retorno_almoco IS NOT NULL)
+        )
+      )
+    `);
 
-/**
- * Registra saída final
- * @param {Object} req - Request object
- * @param {Object} res - Response object
- */
-const registrarSaidaFinal = async (req, res) => {
-    const { funcionario } = req.body;
-    try {
-        const result = await pool.query(
-            `UPDATE registros 
-             SET saida_final = NOW() 
-             WHERE funcionario = $1 AND saida_final IS NULL
-             RETURNING *`,
-            [funcionario]
-        );
-        res.status(200).json(result.rows[0]);
+        console.log('[DB] Tabelas inicializadas com sucesso');
     } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-};
-
-/**
- * Lista registros recentes (último de cada funcionário)
- * @param {Object} req - Request object
- * @param {Object} res - Response object
- */
-const listarRegistrosRecentes = async (req, res) => {
-    try {
-        const result = await pool.query(`
-            SELECT DISTINCT ON (funcionario) *
-            FROM registros
-            ORDER BY funcionario, entrada DESC
-        `);
-        res.status(200).json(result.rows);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-};
-
-/**
- * Lista histórico completo de um funcionário
- * @param {Object} req - Request object
- * @param {Object} res - Response object
- */
-const listarHistoricoFuncionario = async (req, res) => {
-    const { funcionario } = req.params;
-    try {
-        const result = await pool.query(
-            `SELECT * FROM registros 
-             WHERE funcionario = $1 
-             ORDER BY entrada DESC`,
-            [funcionario]
-        );
-        res.status(200).json(result.rows);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
+        console.error('[DB] Erro na inicialização:', err.stack);
+        process.exit(1);
     }
 };
 
 module.exports = {
-    registrarEntrada,
-    registrarSaidaAlmoco,
-    registrarRetornoAlmoco,
-    registrarSaidaFinal,
-    listarRegistrosRecentes,
-    listarHistoricoFuncionario
+    pool,
+    initDB
 };
