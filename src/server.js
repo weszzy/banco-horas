@@ -12,8 +12,9 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'views')));
 
 // Rotas
-app.use('/api/funcionarios', require('./routes/funcionario'));
-app.use('/api/registros', require('./routes/registro'));
+app.use('/api/funcionarios', require('./routes/funcionarioRoutes'));
+app.use('/api/registros', require('./routes/registroRoutes'));
+
 
 // Health Check
 app.get('/health', async (req, res) => {
