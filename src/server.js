@@ -1,35 +1,47 @@
 require('dotenv').config();
 const express = require('express');
 const path = require('path');
-const { initDB } = require('./models/registroModel');
+const db = require('./models/database');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Middlewares
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'views')));
-app.use('/assets', express.static(path.join(__dirname, 'views', 'assets')));
 
 // Rotas
-app.use('/api/funcionarios', require('./routes/funcionarioRoutes'));
-app.use('/api/registros', require('./routes/registroRoutes'));
+app.use('/api/funcionarios', require('./routes/funcionario'));
+app.use('/api/registros', require('./routes/registro'));
 
-// Rota para o frontend
-app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, 'views', 'index.html'));
+// Health Check
+app.get('/health', async (req, res) => {
+    try {
+        await db.query('SELECT NOW()');
+        res.status(200).json({
+            status: 'healthy',
+            database: 'connected'
+        });
+    } catch (error) {
+        res.status(500).json({
+            status: 'unhealthy',
+            database: 'disconnected'
+        });
+    }
 });
 
 // Inicialização
 const startServer = async () => {
     try {
-        await initDB();
+        await db.init();
+
         app.listen(PORT, () => {
-            console.log(`Servidor rodando na porta ${PORT}`);
-            console.log(`Ambiente: ${process.env.NODE_ENV || 'development'}`);
+            console.log(`🟢 Servidor rodando na porta ${PORT}`);
+            console.log(`🔵 Ambiente: ${process.env.NODE_ENV || 'development'}`);
         });
-    } catch (err) {
-        console.error('Falha ao iniciar servidor:', err);
+    } catch (error) {
+        console.error('🔴 Falha crítica ao iniciar servidor:', error);
         process.exit(1);
     }
 };
