@@ -4,8 +4,10 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const cors = require('cors');
 const path = require('path');
-const errorHandler = require('./src/middlewares/error.middleware'); // Caminho corrigido
-const logger = require('./utils/logger.util'); // Caminho corrigido
+
+// Importações com caminhos relativos corretos (considerando que server.js está dentro de src/)
+const errorHandler = require('./middlewares/error.middleware');
+const logger = require('./utils/logger.util');
 
 const app = express();
 
