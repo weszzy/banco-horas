@@ -5,7 +5,7 @@ const rateLimit = require('express-rate-limit');
 const cors = require('cors');
 const path = require('path');
 
-// Importações com caminhos relativos corretos (considerando que server.js está dentro de src/)
+// Importações com caminhos relativos corretos
 const errorHandler = require('./middlewares/error.middleware');
 const logger = require('./utils/logger.util');
 
@@ -15,7 +15,8 @@ const app = express();
 // 1. Configuração Inicial
 // ========================
 if (process.env.RUN_MIGRATIONS === 'true') {
-    const { sequelize } = require('./src/config/database');
+    const { sequelize } = require('./config/database');
+
     sequelize.sync({ alter: true })
         .then(() => logger.info('✅ Migrações executadas com sucesso'))
         .catch(err => logger.error('❌ Falha nas migrações:', err));
@@ -41,21 +42,21 @@ const limiter = rateLimit({
 app.use('/api/', limiter);
 
 // ========================
-// 3. Rotas (Atualizadas para os novos nomes)
+// 3. Rotas (Caminhos corrigidos)
 // ========================
-app.use('/api/auth', require('./src/routes/auth.routes'));
-app.use('/api/employees', require('./src/routes/employee.routes')); // Antigo /funcionarios
-app.use('/api/time-records', require('./src/routes/time-record.routes')); // Antigo /registros
+app.use('/api/auth', require('./routes/auth.routes'));
+app.use('/api/employees', require('./routes/employee.routes'));
+app.use('/api/time-records', require('./routes/time-record.routes'));
 
 // ========================
-// 4. Servir Frontend (Novo)
+// 4. Servir Frontend
 // ========================
-app.use(express.static(path.join(__dirname, 'src', 'views')));
-app.use('/assets', express.static(path.join(__dirname, 'src', 'assets')));
+app.use(express.static(path.join(__dirname, 'views')));
+app.use('/assets', express.static(path.join(__dirname, 'assets')));
 
 // Rota padrão para SPA (Single Page Application)
 app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, 'src', 'views', 'index.html'));
+    res.sendFile(path.join(__dirname, 'views', 'index.html'));
 });
 
 // ========================

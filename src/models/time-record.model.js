@@ -1,5 +1,5 @@
 const { DataTypes } = require('sequelize');
-const sequelize = require('../config/database');
+const { sequelize } = require('../config/database');
 
 const TimeRecord = sequelize.define('TimeRecord', {
     startTime: {
@@ -74,4 +74,4 @@ const TimeRecord = sequelize.define('TimeRecord', {
     }
 });
 
-module.exports = TimeRecord;
+module.exports = { TimeRecord };
