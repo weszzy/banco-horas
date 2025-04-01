@@ -61,6 +61,40 @@ const validateTimeRecord = (req, res, next) => {
     next();
 };
 
+const validateFuncionario = (req, res, next) => {
+    const { nome, email, senha } = req.body;
+
+    if (!nome || nome.length < 3) {
+        return res.status(400).json({
+            success: false,
+            error: 'Nome deve ter pelo menos 3 caracteres'
+        });
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email || !emailRegex.test(email)) {
+        return res.status(400).json({
+            success: false,
+            error: 'E-mail inválido'
+        });
+    }
+
+    if (!senha || senha.length < 6) {
+        return res.status(400).json({
+            success: false,
+            error: 'Senha deve ter pelo menos 6 caracteres'
+        });
+    }
+
+    next();
+};
+
+module.exports = {
+    validateFuncionario,
+    // mantenha as outras validações existentes
+};
+
+
 module.exports = {
     validateLogin,
     validateEmployee,

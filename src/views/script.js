@@ -11,6 +11,8 @@ class PontoSystem {
     this.setupEventListeners();
   }
 
+
+
   // ================ MÉTODOS PRINCIPAIS ================
   initSelect2() {
     $('#funcionarioSelect').select2({
@@ -172,6 +174,95 @@ class PontoSystem {
     }
   }
 }
+
+class FuncionarioManager {
+  static init() {
+    // Evento do botão salvar
+    document.getElementById('btnSalvarFuncionario').addEventListener('click', this.cadastrarFuncionario);
+
+    // Validação em tempo real
+    document.querySelectorAll('#formNovoFuncionario input').forEach(input => {
+      input.addEventListener('input', this.validarFormulario);
+    });
+  }
+
+  static validarFormulario() {
+    const form = document.getElementById('formNovoFuncionario');
+    let isValid = true;
+
+    // Validação do nome
+    if (form.nome.value.length < 3) {
+      form.nome.classList.add('is-invalid');
+      isValid = false;
+    } else {
+      form.nome.classList.remove('is-invalid');
+    }
+
+    // Validação de e-mail
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(form.email.value)) {
+      form.email.classList.add('is-invalid');
+      isValid = false;
+    } else {
+      form.email.classList.remove('is-invalid');
+    }
+
+    // Validação de senha
+    if (form.senha.value.length < 6) {
+      form.senha.classList.add('is-invalid');
+      isValid = false;
+    } else {
+      form.senha.classList.remove('is-invalid');
+    }
+
+    return isValid;
+  }
+
+  static async cadastrarFuncionario() {
+    if (!this.validarFormulario()) return;
+
+    const form = document.getElementById('formNovoFuncionario');
+    const dados = {
+      nome: form.nome.value,
+      email: form.email.value,
+      senha: form.senha.value,
+      cargo: form.cargo.value
+    };
+
+    try {
+      const response = await fetch('/api/funcionarios', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(dados)
+      });
+
+      if (!response.ok) {
+        const erro = await response.json();
+        throw new Error(erro.message || 'Erro ao cadastrar');
+      }
+
+      // Fecha o modal e limpa o formulário
+      bootstrap.Modal.getInstance('#novoFuncionarioModal').hide();
+      form.reset();
+
+      // Atualiza a lista de funcionários
+      PontoSystem.loadFuncionarios();
+
+      // Mostra mensagem de sucesso
+      PontoSystem.showAlert('success', 'Funcionário cadastrado com sucesso!');
+    } catch (erro) {
+      PontoSystem.showAlert('danger', erro.message);
+    }
+  }
+}
+
+// Inicialize junto com o PontoSystem
+document.addEventListener('DOMContentLoaded', () => {
+  new PontoSystem();
+  FuncionarioManager.init();
+});
 
 // Inicialização
 document.addEventListener('DOMContentLoaded', () => new PontoSystem());
