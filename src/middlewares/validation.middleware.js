@@ -89,13 +89,9 @@ const validateFuncionario = (req, res, next) => {
     next();
 };
 
+
 module.exports = {
     validateFuncionario,
-    // mantenha as outras validações existentes
-};
-
-
-module.exports = {
     validateLogin,
     validateEmployee,
     validateTimeRecord
