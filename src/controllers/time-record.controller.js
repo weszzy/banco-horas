@@ -1,7 +1,5 @@
-const { TimeRecord, Employee } = require('../models'); // Assume que src/models/index.js exporta tudo
-// Ou importe individualmente:
-// const { TimeRecord } = require('../models/time-record.model');
-// const { Employee } = require('../models/employee.model');
+const { TimeRecord } = require('../models/time-record.model');
+const { Employee } = require('../models/employee.model');
 
 const { sendResponse } = require('../utils/response.util');
 const logger = require('../utils/logger.util');
@@ -179,11 +177,9 @@ class TimeRecordController {
       }
 
       // 3. Opcional: Exigir que o almoço tenha sido registrado (ida e volta)
-      // Descomente se for uma regra de negócio obrigatória
       /*
       if (!record.lunchStartTime || !record.lunchEndTime) {
-          logger.warn(`Tentativa de check-out sem registro completo de almoço para Record ID ${record.id}`);
-          return sendResponse(res, 400, 'Registre a saída e o retorno do almoço antes de fazer o check-out.');
+          // ... (código omitido)
       }
       */
 
@@ -198,12 +194,10 @@ class TimeRecordController {
         return sendResponse(res, 400, 'O horário de check-out deve ser posterior ao retorno do almoço.');
       }
 
-
       // 5. Salva o registro. O hook `beforeSave` no modelo calculará `totalHours`.
       await record.save();
 
       logger.info(`Check-out registrado com sucesso para employeeId ${employeeId} (Record ID: ${record.id}). Horas: ${record.totalHours}`);
-      // Retorna o registro completo, incluindo as horas calculadas
       sendResponse(res, 200, 'Check-out registrado com sucesso.', record);
 
     } catch (error) {
@@ -215,35 +209,29 @@ class TimeRecordController {
   /**
    * @route GET /api/time-records/employee/:employeeId
    * @description Busca o histórico de registros de ponto para um funcionário específico.
-   * @access Autenticado (Admin pode ver todos, funcionário só o seu)
    */
   async getHistory(req, res) {
-    const requestedEmployeeId = parseInt(req.params.employeeId, 10); // ID do histórico solicitado
-    const loggedInUserId = req.user.id;         // ID do usuário logado
-    const loggedInUserRole = req.user.role;     // Papel do usuário logado
+    const requestedEmployeeId = parseInt(req.params.employeeId, 10);
+    const loggedInUserId = req.user.id;
+    const loggedInUserRole = req.user.role;
 
     try {
-      // Validação de NaN após parseInt
       if (isNaN(requestedEmployeeId)) {
         return sendResponse(res, 400, 'ID do funcionário inválido.');
       }
 
-      // 1. Verifica permissão: Admin pode ver qualquer histórico,
-      //    usuário normal só pode ver o próprio histórico.
+      // 1. Verifica permissão
       if (loggedInUserRole !== 'admin' && loggedInUserId !== requestedEmployeeId) {
         logger.warn(`Usuário ${loggedInUserId} (${loggedInUserRole}) tentou acessar histórico do funcionário ${requestedEmployeeId}`);
         return sendResponse(res, 403, 'Acesso negado. Você só pode visualizar seu próprio histórico.');
       }
 
-      // 2. Busca os registros do funcionário solicitado
+      // 2. Busca os registros
       const records = await TimeRecord.findAll({
         where: { employeeId: requestedEmployeeId },
-        order: [['startTime', 'DESC']], // Mais recentes primeiro
-        // Opcional: incluir dados do funcionário (se necessário)
-        // include: [{ model: Employee, as: 'employee', attributes: ['id', 'fullName'] }]
+        order: [['startTime', 'DESC']],
       });
 
-      // Não é um erro se não houver registros, apenas retorna lista vazia
       sendResponse(res, 200, 'Histórico de registros recuperado com sucesso.', records);
 
     } catch (error) {
@@ -255,7 +243,6 @@ class TimeRecordController {
   /**
    * @route GET /api/time-records/today
    * @description Busca o registro de ponto de hoje para o usuário autenticado.
-   * @access Autenticado
    */
   async getTodaysRecord(req, res) {
     const employeeId = req.user.id;
@@ -263,11 +250,13 @@ class TimeRecordController {
       const record = await this._findOpenRecordToday(employeeId);
       if (!record) {
         // Tenta encontrar um registro fechado de hoje
+        const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+        const todayEnd = new Date(todayStart); todayEnd.setDate(todayStart.getDate() + 1);
         const closedRecord = await TimeRecord.findOne({
           where: {
             employeeId: employeeId,
-            startTime: { [Op.gte]: new Date().setHours(0, 0, 0, 0), [Op.lt]: new Date(new Date().setHours(0, 0, 0, 0)).setDate(new Date().getDate() + 1) },
-            endTime: { [Op.ne]: null } // Onde endTime não é nulo
+            startTime: { [Op.gte]: todayStart, [Op.lt]: todayEnd },
+            endTime: { [Op.ne]: null }
           },
           order: [['startTime', 'DESC']]
         });
@@ -276,7 +265,6 @@ class TimeRecordController {
         } else {
           sendResponse(res, 404, 'Nenhum registro de ponto encontrado para hoje.');
         }
-
       } else {
         sendResponse(res, 200, 'Registro de hoje encontrado (em andamento).', record);
       }
@@ -285,9 +273,6 @@ class TimeRecordController {
       sendResponse(res, 500, 'Erro interno ao buscar registro de hoje.');
     }
   }
-
-
 }
 
-// Exporta uma instância da classe
 module.exports = new TimeRecordController();
