@@ -1,12 +1,17 @@
 // .sequelizerc
 const path = require('path');
 
+// __dirname neste contexto refere-se ao diretório onde .sequelizerc está localizado (a raiz do projeto)
 module.exports = {
-    // Aponta para o novo arquivo de configuração do CLI
-    config: path.resolve('./config/config.js'),
-    // Mantém os outros caminhos como estão
-    'models-path': path.resolve('./src/models'),
-    'migrations-path': path.resolve('./src/migrations'),
-    // Adicione o caminho para os seeders também
-    'seeders-path': path.resolve('./src/seeders')
+    // Caminho para config/config.js (na raiz)
+    config: path.join(__dirname, 'config', 'config.js'),
+
+    // Caminho para src/models (dentro de src)
+    'models-path': path.join(__dirname, 'src', 'models'),
+
+    // Caminho para src/migrations (dentro de src)
+    'migrations-path': path.join(__dirname, 'src', 'migrations'),
+
+    // Caminho para src/seeders (dentro de src)
+    'seeders-path': path.join(__dirname, 'src', 'seeders')
 };
