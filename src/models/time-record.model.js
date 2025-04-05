@@ -2,8 +2,22 @@ const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/database'); // Confirme o caminho
 const { Employee } = require('./employee.model'); // Importar Employee para associação
 
+// Função de validação reutilizável e corrigida
+function isDateOrNullOrUndefined(value, fieldName) {
+    // Permite explicitamente null ou undefined
+    if (value === null || typeof value === 'undefined') {
+        return; // Válido
+    }
+    // Se não for null/undefined, verifica se é uma instância de Date válida
+    // ou uma string/número que pode ser convertido para uma Date válida.
+    const date = new Date(value);
+    if (!(date instanceof Date) || isNaN(date.getTime())) {
+        throw new Error(`${fieldName} deve ser uma data válida ou nulo.`);
+    }
+}
+
 const TimeRecord = sequelize.define('TimeRecord', {
-    id: { // Adicionar ID explicitamente
+    id: {
         type: DataTypes.INTEGER,
         autoIncrement: true,
         primaryKey: true
@@ -18,14 +32,11 @@ const TimeRecord = sequelize.define('TimeRecord', {
     },
     lunchStartTime: {
         type: DataTypes.DATE,
-        allowNull: true, // Almoço é opcional ou pode não ter sido registrado ainda
+        allowNull: true,
         field: 'lunch_start_time',
         validate: {
-            isDateOrNull(value) { // Validador customizado
-                if (value !== null && !(value instanceof Date) && isNaN(new Date(value).getTime())) {
-                    throw new Error('lunchStartTime deve ser uma data válida ou nulo.');
-                }
-            }
+            // Usa a função de validação corrigida
+            isDateOrNullOrUndefined: (value) => isDateOrNullOrUndefined(value, 'lunchStartTime')
         }
     },
     lunchEndTime: {
@@ -33,28 +44,22 @@ const TimeRecord = sequelize.define('TimeRecord', {
         allowNull: true,
         field: 'lunch_end_time',
         validate: {
-            isDateOrNull(value) { // Validador customizado
-                if (value !== null && !(value instanceof Date) && isNaN(new Date(value).getTime())) {
-                    throw new Error('lunchEndTime deve ser uma data válida ou nulo.');
-                }
-            }
+            // Usa a função de validação corrigida
+            isDateOrNullOrUndefined: (value) => isDateOrNullOrUndefined(value, 'lunchEndTime')
         }
     },
     endTime: {
         type: DataTypes.DATE,
-        allowNull: true, // Fica nulo até o check-out
+        allowNull: true,
         field: 'end_time',
         validate: {
-            isDateOrNull(value) { // Validador customizado
-                if (value !== null && !(value instanceof Date) && isNaN(new Date(value).getTime())) {
-                    throw new Error('endTime deve ser uma data válida ou nulo.');
-                }
-            }
+            // Usa a função de validação corrigida
+            isDateOrNullOrUndefined: (value) => isDateOrNullOrUndefined(value, 'endTime')
         }
     },
     totalHours: {
-        type: DataTypes.DECIMAL(10, 2), // DECIMAL é bom para horas
-        allowNull: true, // Calculado no final, pode ser nulo antes disso
+        type: DataTypes.DECIMAL(10, 2),
+        allowNull: true,
         field: 'total_hours',
         validate: {
             min: {
@@ -63,66 +68,47 @@ const TimeRecord = sequelize.define('TimeRecord', {
             }
         }
     },
-    employeeId: { // Chave estrangeira
+    employeeId: {
         type: DataTypes.INTEGER,
         allowNull: false,
         field: 'employee_id',
         references: {
-            model: Employee, // Referencia o modelo Employee importado
+            model: Employee,
             key: 'id'
         },
-        onUpdate: 'CASCADE', // Opcional: o que fazer se o ID do funcionário mudar
-        onDelete: 'CASCADE'  // Opcional: o que fazer se o funcionário for deletado (apagar registros?) ou 'SET NULL'
+        onUpdate: 'CASCADE',
+        onDelete: 'CASCADE'
     }
 }, {
     tableName: 'time_records',
-    timestamps: true, // Habilita createdAt e updatedAt
-    underscored: true, // Mapeia camelCase para snake_case
+    timestamps: true,
+    underscored: true,
     hooks: {
-        // Hook para calcular as horas totais ANTES de salvar (criação ou atualização)
         beforeSave: (record, options) => {
-            // Só calcula se tiver hora de início e fim
             if (record.startTime && record.endTime) {
-                // Garante que as datas sejam objetos Date
                 const startTime = new Date(record.startTime);
                 const endTime = new Date(record.endTime);
-
-                // Calcula a duração do trabalho em milissegundos
                 let workDurationMs = endTime.getTime() - startTime.getTime();
-
-                // Calcula a duração do almoço em milissegundos, somente se ambos existirem
                 let lunchDurationMs = 0;
                 if (record.lunchStartTime && record.lunchEndTime) {
                     const lunchStartTime = new Date(record.lunchStartTime);
                     const lunchEndTime = new Date(record.lunchEndTime);
-                    if (lunchEndTime > lunchStartTime) { // Garante que o fim seja depois do início
+                    if (lunchEndTime > lunchStartTime) {
                         lunchDurationMs = lunchEndTime.getTime() - lunchStartTime.getTime();
                     } else {
-                        console.warn(`Registro ID ${record.id}: Horário de fim do almoço (${lunchEndTime}) é anterior ou igual ao início (${lunchStartTime}). Duração do almoço será 0.`);
+                        console.warn(`Record ID ${record.id || '(new)'}: Lunch end time not after start time.`);
                     }
                 }
-
-                // Calcula o total de horas trabalhadas (subtrai almoço)
                 const totalWorkMs = workDurationMs - lunchDurationMs;
-
-                // Converte para horas e arredonda para 2 casas decimais
-                // Garante que não seja negativo
-                const totalHours = Math.max(0, totalWorkMs / (1000 * 60 * 60)).toFixed(2);
-                record.totalHours = totalHours;
-
+                record.totalHours = Math.max(0, totalWorkMs / (1000 * 60 * 60)).toFixed(2);
             } else {
-                // Se não houver hora de fim, totalHours deve ser null ou 0
-                record.totalHours = null; // Ou 0, dependendo da regra de negócio
+                record.totalHours = null;
             }
         }
     }
 });
 
-// Definindo a Associação (Opcional aqui, mas bom para clareza e Eager Loading)
-// TimeRecord pertence a um Employee
 TimeRecord.belongsTo(Employee, { foreignKey: 'employeeId', as: 'employee' });
-// Employee tem muitos TimeRecords
 Employee.hasMany(TimeRecord, { foreignKey: 'employeeId', as: 'timeRecords' });
-
 
 module.exports = { TimeRecord };
