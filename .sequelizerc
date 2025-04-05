@@ -1,17 +1,17 @@
 // .sequelizerc
 const path = require('path');
 
-// __dirname neste contexto refere-se ao diretório onde .sequelizerc está localizado (a raiz do projeto)
+// __dirname é a raiz do projeto onde .sequelizerc está
 module.exports = {
-    // Caminho para config/config.js (na raiz)
+    // Aponta para config/config.js (na raiz)
     config: path.join(__dirname, 'config', 'config.js'),
 
-    // Caminho para src/models (dentro de src)
+    // Aponta para src/models (onde seus modelos estão)
     'models-path': path.join(__dirname, 'src', 'models'),
 
-    // Caminho para src/migrations (dentro de src)
-    'migrations-path': path.join(__dirname, 'src', 'migrations'),
+    // Aponta para migrations/ (na raiz, criada pelo init)
+    'migrations-path': path.join(__dirname, 'migrations'),
 
-    // Caminho para src/seeders (dentro de src)
-    'seeders-path': path.join(__dirname, 'src', 'seeders')
+    // Aponta para seeders/ (na raiz, criada pelo init)
+    'seeders-path': path.join(__dirname, 'seeders')
 };
