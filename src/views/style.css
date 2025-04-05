@@ -1,141 +1,120 @@
 :root {
-    --primary-color: #3498db;
-    --secondary-color: #2c3e50;
-    --success-color: #28a745;
+    --primary-color: #0d6efd;
+    /* Bootstrap primary */
+    --secondary-color: #6c757d;
+    /* Bootstrap secondary */
+    --success-color: #198754;
+    /* Bootstrap success */
     --danger-color: #dc3545;
-    --warning-color: #fd7e14;
-    --info-color: #17a2b8;
+    /* Bootstrap danger */
+    --warning-color: #ffc107;
+    /* Bootstrap warning */
+    --info-color: #0dcaf0;
+    /* Bootstrap info */
 }
 
-/* Layout Principal */
-.sidebar {
-    position: fixed;
-    top: 0;
-    bottom: 0;
-    left: 0;
-    z-index: 100;
-    padding: 48px 0 0;
-    box-shadow: inset -1px 0 0 rgba(0, 0, 0, .1);
-    background-color: var(--secondary-color);
-}
-
-.main-content {
-    margin-left: 250px;
-    padding-top: 1rem;
+/* Ajustes Globais */
+body {
     background-color: #f8f9fa;
-    min-height: 100vh;
+    /* Cor de fundo leve */
+    padding-top: 56px;
+    /* Altura da navbar fixa para evitar sobreposição */
 }
 
-/* Componentes Personalizados */
-.funcionario-option {
-    display: flex;
-    align-items: center;
-    padding: 8px 12px;
+/* Container Principal */
+.main-container {
+    padding-top: 1rem;
+    /* Espaço interno no topo */
+    padding-bottom: 1rem;
 }
 
-.funcionario-avatar {
-    width: 30px;
-    height: 30px;
-    border-radius: 50%;
-    margin-right: 10px;
-    object-fit: cover;
+
+/* Container de Alertas */
+.alert-container {
+    position: fixed;
+    /* Fixo na tela */
+    top: 70px;
+    /* Abaixo da navbar (56px + margem) */
+    right: 20px;
+    z-index: 1100;
+    /* Acima da maioria dos elementos */
+    min-width: 300px;
+    max-width: 90%;
 }
 
-/* Select2 Custom */
+
+/* Estilos para Select2 */
 .select2-container--default .select2-selection--single {
-    height: 45px;
-    padding: 8px 16px;
+    height: calc(1.5em + 0.75rem + 2px);
+    /* Altura padrão do Bootstrap */
+    padding: 0.375rem 0.75rem;
     border: 1px solid #ced4da;
     border-radius: 0.375rem;
-}
-
-.select2-container--default .select2-selection--single .select2-selection__arrow {
-    height: 43px;
+    display: flex;
+    align-items: center;
 }
 
 .select2-container--default .select2-selection--single .select2-selection__rendered {
-    line-height: 45px !important;
+    line-height: 1.5;
+    /* Alinhamento de texto padrão */
+    padding-left: 0;
+    padding-right: 0;
+    /* Ajuste para a seta não sobrepor */
+    width: calc(100% - 30px);
+    /* Deixa espaço para a seta */
 }
 
-/* Alertas */
-.alert {
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    z-index: 1100;
-    min-width: 300px;
-    animation: fadeIn 0.3s;
+.select2-container--default .select2-selection--single .select2-selection__arrow {
+    height: calc(1.5em + 0.75rem);
+    /* Ajusta altura da seta */
+    position: absolute;
+    top: 1px;
+    right: 1px;
+    width: 20px;
 }
 
-@keyframes fadeIn {
-    from {
-        opacity: 0;
-        transform: translateY(-20px);
-    }
-
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
+/* Ajuste para dropdown do Select2 dentro de modais ou outros containers */
+.select2-container--open {
+    z-index: 1056;
+    /* Maior que o z-index do modal (1055 por padrão) */
 }
 
-/* Cards */
-.card {
-    border: none;
-    border-radius: 0.5rem;
-    overflow: hidden;
-}
 
-.card-header {
-    font-weight: 600;
-}
+/* REMOVA estilos genéricos de botão se existirem */
+/* Ex: */
+/* button { ... } */
 
-/* Botões */
-.btn-group {
-    gap: 0.5rem;
-}
+/* Adicione aqui apenas estilos MUITO específicos */
+
 
 /* Responsividade */
+@media (max-width: 992px) {
+
+    /* Cards empilham automaticamente */
+    body {
+        padding-top: 56px;
+        /* Mantém espaço da navbar */
+    }
+}
+
 @media (max-width: 768px) {
-    .sidebar {
-        width: 100%;
-        height: auto;
-        position: relative;
-        padding: 1rem;
+    .main-container {
+        padding-left: 0.5rem;
+        padding-right: 0.5rem;
     }
 
-    .main-content {
-        margin-left: 0;
-        padding: 1rem;
+    .alert-container {
+        top: 65px;
+        left: 10px;
+        right: 10px;
+        min-width: auto;
+        max-width: none;
+        width: auto;
+        /* Ajusta à largura do conteúdo */
     }
 
-    .btn-group {
-        flex-direction: column;
+    body {
+        padding-top: 56px;
+        /* Mantém espaço da navbar */
     }
-
-    .select2-container {
-        width: 100% !important;
-    }
-}
-
-/* Validação de formulário */
-.is-invalid {
-    border-color: var(--danger-color) !important;
-}
-
-.is-invalid+.invalid-feedback {
-    display: block;
-    color: var(--danger-color);
-    font-size: 0.875em;
-}
-
-/* Espaçamento no modal */
-.modal-body .mb-3 {
-    margin-bottom: 1rem !important;
-}
-
-/* Botão de novo funcionário */
-.btn-success {
-    background-color: var(--success-color);
-    border-color: var(--success-color);
 }
