@@ -1,28 +1,25 @@
 /**
- * Sistema de Controle de Ponto v1.2.0
+ * Sistema de Controle de Ponto v1.2.1
  * Gerencia autenticação, registro de ponto e cadastro de funcionários.
  */
 
-// Encapsula toda a lógica em uma classe para evitar variáveis globais
 class PontoApp {
   constructor() {
-    // Elementos da UI (cache para performance)
+    // Cache de Elementos da UI
     this.ui = {
       loginModal: new bootstrap.Modal(document.getElementById('loginModal')),
       loginForm: document.getElementById('loginForm'),
       loginError: document.getElementById('loginError'),
       btnLoginSubmit: document.getElementById('btnLoginSubmit'),
       authArea: document.getElementById('authArea'),
+      adminTools: document.getElementById('adminTools'),
+      btnShowNovoFuncionarioModal: document.getElementById('btnShowNovoFuncionarioModal'),
       contentArea: document.getElementById('contentArea'),
       loginPrompt: document.getElementById('loginPrompt'),
       alertPlaceholder: document.getElementById('alertPlaceholder'),
-      employeeSelect: $('#employeeSelect'), // jQuery para Select2
-      employeeSelectContainer: document.getElementById('employeeSelect').parentElement, // Container do select
-      employeeSelectHelp: document.getElementById('employeeSelectHelp'),
-      btnEntrada: document.getElementById('btnEntrada'),
-      btnSaidaAlmoco: document.getElementById('btnSaidaAlmoco'),
-      btnRetornoAlmoco: document.getElementById('btnRetornoAlmoco'),
-      btnSaida: document.getElementById('btnSaida'),
+      employeeSelect: $('#employeeSelect'),
+      employeeSelectContainer: document.getElementById('employeeSelectContainer'),
+      // Status elements
       statusContainer: document.getElementById('statusContainer'),
       statusDate: document.getElementById('statusDate'),
       statusPlaceholder: document.getElementById('statusPlaceholder'),
@@ -32,23 +29,28 @@ class PontoApp {
       statusRetornoAlmoco: document.getElementById('statusRetornoAlmoco'),
       statusSaida: document.getElementById('statusSaida'),
       statusTotalHoras: document.getElementById('statusTotalHoras'),
+      // Action buttons
+      btnEntrada: document.getElementById('btnEntrada'),
+      btnSaidaAlmoco: document.getElementById('btnSaidaAlmoco'),
+      btnRetornoAlmoco: document.getElementById('btnRetornoAlmoco'),
+      btnSaida: document.getElementById('btnSaida'),
       // Modal Novo Funcionário
       novoFuncionarioModal: new bootstrap.Modal(document.getElementById('novoFuncionarioModal')),
-      btnShowNovoFuncionarioModal: document.getElementById('btnShowNovoFuncionarioModal'),
       formNovoFuncionario: document.getElementById('formNovoFuncionario'),
       btnSalvarFuncionario: document.getElementById('btnSalvarFuncionario'),
       novoFuncError: document.getElementById('novoFuncError'),
     };
 
-    // Estado da aplicação
+    // Estado da Aplicação
     this.state = {
       token: localStorage.getItem('authToken') || null,
       currentUser: JSON.parse(localStorage.getItem('currentUser')) || null,
-      selectedEmployeeId: null, // ID selecionado no dropdown (para admins)
-      todayRecord: null, // Registro do dia para o usuário sendo visualizado
-      employeeList: [] // Cache da lista de funcionários (para admins)
+      selectedEmployeeId: null,
+      todayRecord: null,
+      employeeList: []
     };
 
+    // Inicialização
     this._init();
   }
 
@@ -57,15 +59,21 @@ class PontoApp {
     console.log("PontoApp inicializando...");
     this._setupEventListeners();
     this._initSelect2();
-    this._checkInitialAuth(); // Verifica se já está logado ao carregar
+    // Define a UI inicial baseada na autenticação
+    if (this.state.token && this.state.currentUser) {
+      this._checkInitialAuth();
+    } else {
+      this._showLoginView();
+    }
   }
 
   _setupEventListeners() {
     // Login
-    this.ui.loginForm.addEventListener('submit', (e) => e.preventDefault()); // Previne submit padrão
+    this.ui.loginForm.addEventListener('submit', (e) => {
+      e.preventDefault(); // Previne submit padrão
+      this.handleLogin(); // Chama o login ao pressionar Enter no form
+    });
     this.ui.btnLoginSubmit.addEventListener('click', () => this.handleLogin());
-
-    // Logout (adicionado dinamicamente)
 
     // Ações de Ponto
     this.ui.btnEntrada.addEventListener('click', () => this.registrarPonto('check-in'));
@@ -75,62 +83,61 @@ class PontoApp {
 
     // Seleção de Funcionário (Admin)
     this.ui.employeeSelect.on('change', (e) => {
-      this.state.selectedEmployeeId = e.target.value ? parseInt(e.target.value, 10) : null;
+      // Usar o valor diretamente, já é string ou null
+      const selectedValue = $(e.target).val();
+      this.state.selectedEmployeeId = selectedValue ? parseInt(selectedValue, 10) : null;
       this.handleEmployeeSelectionChange();
     });
 
-
     // Cadastro de Novo Funcionário
-    this.ui.formNovoFuncionario.addEventListener('submit', (e) => e.preventDefault());
+    this.ui.formNovoFuncionario.addEventListener('submit', (e) => {
+      e.preventDefault(); // Previne submit padrão
+      this.handleSaveNewEmployee(); // Chama ao pressionar Enter no form
+    });
     this.ui.btnSalvarFuncionario.addEventListener('click', () => this.handleSaveNewEmployee());
-    // Limpa erros ao abrir o modal
+
+    // Limpa erros e validação ao ABRIR o modal de novo funcionário
     document.getElementById('novoFuncionarioModal').addEventListener('show.bs.modal', () => {
       this.ui.formNovoFuncionario.reset();
       this.ui.formNovoFuncionario.classList.remove('was-validated');
       this.ui.novoFuncError.style.display = 'none';
       this.ui.novoFuncError.textContent = '';
+      // Remove classes 'is-invalid' de todos os inputs/selects dentro do form
+      this.ui.formNovoFuncionario.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
     });
-    // Validação Bootstrap em tempo real (opcional)
+    // Validação Bootstrap em tempo real (opcional, mas útil)
     this.ui.formNovoFuncionario.querySelectorAll('input, select').forEach(input => {
       input.addEventListener('input', () => {
+        // Só revalida se o usuário JÁ tentou submeter uma vez
         if (this.ui.formNovoFuncionario.classList.contains('was-validated')) {
-          this._validateNewEmployeeForm(); // Revalida ao digitar se já tentou salvar
+          this._validateNewEmployeeForm(); // Revalida ao digitar
         }
       });
     });
-
   }
 
   _initSelect2() {
     this.ui.employeeSelect.select2({
-      placeholder: "Selecione um funcionário para ver/registrar",
+      placeholder: "Selecione para ver status",
       allowClear: true,
       width: '100%',
-      dropdownParent: this.ui.employeeSelectContainer // Ajuda com modais ou layouts complexos
+      // dropdownParent: $('#employeeSelect').parent() // Pode ser necessário se houver problemas de z-index
     });
-    // Inicialmente desabilitado, habilitar para admin após login
-    this.ui.employeeSelect.prop('disabled', true);
-    this.ui.employeeSelectContainer.style.display = 'none';
-    this.ui.employeeSelectHelp.style.display = 'none';
+    this.ui.employeeSelect.prop('disabled', true); // Começa desabilitado
   }
-
 
   // ================ AUTENTICAÇÃO ================
 
   _checkInitialAuth() {
-    if (this.state.token && this.state.currentUser) {
-      console.log("Usuário já logado:", this.state.currentUser.email);
-      this._updateUIAfterLogin();
-    } else {
-      console.log("Nenhum usuário logado.");
-      this._showLoginView();
-    }
+    console.log("Verificando autenticação existente...");
+    // Se temos token e usuário, tentamos atualizar a UI como se tivéssemos acabado de logar
+    this._updateUIAfterLogin();
   }
 
   async handleLogin() {
     const email = this.ui.loginForm.email.value;
     const password = this.ui.loginForm.password.value;
-    this.ui.loginError.style.display = 'none'; // Esconde erro anterior
+    this.ui.loginError.style.display = 'none';
 
     if (!email || !password) {
       this.ui.loginError.textContent = 'E-mail e senha são obrigatórios.';
@@ -138,115 +145,120 @@ class PontoApp {
       return;
     }
 
-    try {
-      this.ui.btnLoginSubmit.disabled = true; // Desabilita botão durante request
-      this.ui.btnLoginSubmit.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Entrando...'; // Feedback visual
+    this.ui.btnLoginSubmit.disabled = true;
+    this.ui.btnLoginSubmit.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Entrando...';
 
+    try {
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })
       });
-
       const result = await response.json();
 
       if (!response.ok || !result.success) {
         throw new Error(result.message || `Erro ${response.status}`);
       }
 
-      // Sucesso no Login
       this.state.token = result.data.token;
       this.state.currentUser = result.data.user;
       localStorage.setItem('authToken', this.state.token);
       localStorage.setItem('currentUser', JSON.stringify(this.state.currentUser));
 
-      console.log("Login bem-sucedido:", this.state.currentUser.email);
-      this.ui.loginModal.hide(); // Fecha o modal
-      this._updateUIAfterLogin(); // Atualiza a UI principal
+      console.log("Login bem-sucedido:", this.state.currentUser.email, "Role:", this.state.currentUser.role);
+      this.ui.loginModal.hide();
+      this._updateUIAfterLogin();
 
     } catch (error) {
       console.error("Erro no login:", error);
       this.ui.loginError.textContent = `Falha no login: ${error.message}`;
       this.ui.loginError.style.display = 'block';
     } finally {
-      // Reabilita o botão e restaura texto
       this.ui.btnLoginSubmit.disabled = false;
       this.ui.btnLoginSubmit.innerHTML = 'Entrar';
     }
   }
 
   _updateUIAfterLogin() {
-    // Mostra conteúdo principal, esconde prompt de login
-    this.ui.contentArea.style.display = 'block';
-    this.ui.loginPrompt.style.display = 'none';
-
-    // Atualiza área de autenticação na Navbar
-    this.ui.authArea.innerHTML = `
-          <span class="navbar-text me-3">
-              Bem-vindo, ${this.state.currentUser.fullName}! (${this.state.currentUser.role})
-          </span>
-          <button class="btn btn-outline-secondary" id="btnLogout">Sair</button>
-      `;
-    // Adiciona listener para o botão Logout recém-criado
-    document.getElementById('btnLogout').addEventListener('click', () => this.handleLogout());
-
-
-    // Lógica específica para Admin
-    if (this.state.currentUser.role === 'admin') {
-      this.ui.employeeSelectContainer.style.display = 'block'; // Mostra dropdown
-      this.ui.employeeSelectHelp.style.display = 'block';
-      this.ui.employeeSelect.prop('disabled', false);         // Habilita dropdown
-      this.ui.btnShowNovoFuncionarioModal.style.display = 'inline-block'; // Mostra botão de cadastrar
-      this.loadEmployeeListForAdmin(); // Carrega lista para o dropdown
-    } else {
-      // Usuário não-admin: esconde e desabilita o select, esconde botão de cadastro
-      this.ui.employeeSelectContainer.style.display = 'none';
-      this.ui.employeeSelectHelp.style.display = 'none';
-      this.ui.employeeSelect.prop('disabled', true);
-      this.ui.btnShowNovoFuncionarioModal.style.display = 'none';
-      // Define o funcionário selecionado como o próprio usuário logado
-      this.state.selectedEmployeeId = this.state.currentUser.id;
-      this.handleEmployeeSelectionChange(); // Carrega dados do próprio usuário
+    if (!this.state.currentUser) {
+      console.error("Tentando atualizar UI sem currentUser.");
+      this.handleLogout();
+      return;
     }
 
-    // Define a data atual no card de status
-    this.ui.statusDate.textContent = new Date().toLocaleDateString('pt-BR');
+    this.ui.loginPrompt.style.display = 'none';
+    this.ui.contentArea.style.display = 'block';
 
-    // Carrega o status inicial (do próprio usuário ou do primeiro da lista se admin)
+    // Atualiza Navbar
+    this.ui.authArea.innerHTML = `
+          <span class="navbar-text me-3">
+              Olá, ${this.state.currentUser.fullName}
+          </span>
+          <button class="btn btn-outline-secondary btn-sm" id="btnLogout">Sair</button>
+      `;
+    // Garante que o listener de logout seja adicionado apenas uma vez ou removido e readicionado
+    const btnLogout = document.getElementById('btnLogout');
+    if (btnLogout) { // Verifica se o botão existe antes de adicionar listener
+      btnLogout.removeEventListener('click', this.handleLogout); // Remove listener antigo se existir
+      btnLogout.addEventListener('click', () => this.handleLogout()); // Adiciona novo listener
+    } else {
+      console.error("Botão de logout não encontrado após atualizar a UI.");
+    }
+
+
+    // Verifica se é Admin
+    console.log(`Verificando role para UI: '${this.state.currentUser.role}'`);
+    if (this.state.currentUser.role === 'admin') {
+      console.log("Usuário é admin. Mostrando ferramentas.");
+      this.ui.adminTools.style.display = 'list-item'; // Mostra item da lista na navbar
+      this.ui.employeeSelectContainer.style.display = 'block';
+      this.ui.employeeSelect.prop('disabled', false);
+      this.loadEmployeeListForAdmin();
+    } else {
+      console.log("Usuário não é admin.");
+      this.ui.adminTools.style.display = 'none';
+      this.ui.employeeSelectContainer.style.display = 'none';
+      this.ui.employeeSelect.prop('disabled', true);
+      this.state.selectedEmployeeId = this.state.currentUser.id;
+    }
+
+    this.ui.statusDate.textContent = new Date().toLocaleDateString('pt-BR');
     this.fetchAndUpdateStatus();
   }
 
   handleLogout() {
+    // Limpa estado e localStorage
     this.state.token = null;
     this.state.currentUser = null;
     localStorage.removeItem('authToken');
     localStorage.removeItem('currentUser');
     console.log("Usuário deslogado.");
 
-    // Limpa select2 (se existir)
-    this.ui.employeeSelect.empty().trigger('change');
+    // Limpa select2 (importante fazer antes de desabilitar/esconder)
+    this.ui.employeeSelect.val(null).trigger('change');
     this.ui.employeeSelect.prop('disabled', true);
 
-    this._showLoginView(); // Mostra a tela de login
-    this.resetUIState(); // Limpa o estado da UI (status, botões)
+    // Mostra a view de login e reseta a UI
+    this._showLoginView();
+    this.resetUIState();
   }
 
-
   _showLoginView() {
-    this.ui.contentArea.style.display = 'none'; // Esconde conteúdo principal
-    this.ui.loginPrompt.style.display = 'block'; // Mostra prompt de login
-
-    // Reseta a área de autenticação na Navbar para o botão de Login
+    this.ui.contentArea.style.display = 'none';
+    this.ui.loginPrompt.style.display = 'block';
+    // Reseta a área de autenticação na Navbar
     this.ui.authArea.innerHTML = `
-             <button class="btn btn-primary" id="btnLoginView" data-bs-toggle="modal" data-bs-target="#loginModal">Login</button>
-         `;
-    // Adiciona listener para o novo botão (se necessário, mas o modal já tem)
-    // document.getElementById('btnLoginView').addEventListener('click', () => this.ui.loginModal.show());
+            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#loginModal">Login</button>
+        `;
+    // Garante que as ferramentas de admin e select estejam ocultos
+    this.ui.adminTools.style.display = 'none';
+    this.ui.employeeSelectContainer.style.display = 'none';
   }
 
   resetUIState() {
-    // Limpa card de status
+    // Limpa status
     this.ui.statusPlaceholder.style.display = 'block';
+    this.ui.statusPlaceholder.textContent = 'Faça login para ver seu status.';
     this.ui.statusDetails.style.display = 'none';
     this.ui.statusEntrada.textContent = '--:--';
     this.ui.statusSaidaAlmoco.textContent = '--:--';
@@ -254,109 +266,128 @@ class PontoApp {
     this.ui.statusSaida.textContent = '--:--';
     this.ui.statusTotalHoras.textContent = '-.-- h';
     this.ui.statusDate.textContent = '--/--/----';
-
-
-    // Desabilita todos os botões de ponto
+    // Desabilita botões de ponto
     this.ui.btnEntrada.disabled = true;
     this.ui.btnSaidaAlmoco.disabled = true;
     this.ui.btnRetornoAlmoco.disabled = true;
     this.ui.btnSaida.disabled = true;
-
-    // Limpa estado interno
+    // Limpa estado interno relacionado à visualização
     this.state.selectedEmployeeId = null;
     this.state.todayRecord = null;
+    // Não limpa a lista de funcionários aqui, pois ela pode ser reutilizada se o admin logar novamente
   }
 
   // ================ LÓGICA DE NEGÓCIO (PONTO) ================
 
-  async handleEmployeeSelectionChange() {
-    if (!this.state.selectedEmployeeId) {
-      this.resetUIState(); // Limpa a UI se nenhum funcionário for selecionado
+  handleEmployeeSelectionChange() {
+    // O valor de selectedEmployeeId já foi atualizado pelo listener 'change'
+    // Se admin limpou a seleção (valor null), volta a mostrar o status do próprio admin
+    if (this.state.currentUser.role === 'admin' && !this.state.selectedEmployeeId) {
+      console.log("Admin limpou seleção, mostrando status próprio.");
+      // Define o ID do admin como selecionado para buscar status
+      this.state.selectedEmployeeId = this.state.currentUser.id;
+      // Não precisa atualizar o select visualmente aqui, o 'allowClear' já fez isso
+    } else if (!this.state.selectedEmployeeId) {
+      // Situação estranha: não-admin limpou seleção (não deveria ser possível)
+      console.warn("Seleção limpa por não-admin?");
+      this.resetUIState(); // Reseta a UI como segurança
       return;
     }
-    console.log("Funcionário selecionado:", this.state.selectedEmployeeId);
-    await this.fetchAndUpdateStatus(); // Busca e atualiza o status para o selecionado
+
+    console.log("Seleção mudou para employeeId:", this.state.selectedEmployeeId);
+    this.fetchAndUpdateStatus(); // Busca e atualiza o status para o ID selecionado
   }
 
-
   async fetchAndUpdateStatus() {
-    // Determina de quem buscar o status: o selecionado (admin) ou o logado (não-admin)
-    const targetEmployeeId = (this.state.currentUser.role === 'admin' && this.state.selectedEmployeeId)
-      ? this.state.selectedEmployeeId
-      : this.state.currentUser.id;
-
-    if (!targetEmployeeId) {
-      console.warn("fetchAndUpdateStatus chamado sem targetEmployeeId.");
-      this.resetUIState();
+    // Garante que temos um usuário logado
+    if (!this.state.currentUser) {
+      console.warn("fetchAndUpdateStatus chamado sem usuário logado.");
       return;
     }
 
+    // Define o ID alvo: o selecionado pelo admin ou o próprio usuário logado
+    let targetEmployeeId = this.state.selectedEmployeeId;
+    if (this.state.currentUser.role !== 'admin' || !targetEmployeeId) {
+      targetEmployeeId = this.state.currentUser.id;
+    }
+    // Atualiza o estado interno para garantir consistência
+    this.state.selectedEmployeeId = targetEmployeeId;
+
+
+    // Feedback inicial de carregamento
+    console.log(`Buscando status para employeeId: ${targetEmployeeId}`);
+    this.ui.statusPlaceholder.textContent = 'Carregando status...';
+    this.ui.statusPlaceholder.style.display = 'block';
+    this.ui.statusDetails.style.display = 'none';
+    // Desabilita botões enquanto carrega
+    this._setPointButtonsDisabled(true);
+
     try {
-      // Busca o registro de hoje para o funcionário alvo
-      // Usamos a rota /api/time-records/today se for o usuário logado,
-      // ou /api/time-records/employee/:id/today (precisa criar essa rota?)
-      // Por simplicidade, vamos buscar o histórico e filtrar o de hoje.
-      // Se for só para o usuário logado, /today é mais eficiente.
-
-      // Usando a rota /today (só funciona para o próprio usuário logado)
-      // Ajuste se admin precisar ver o /today de outro usuário
-      let url = '/api/time-records/today';
-      // Se admin selecionou outro user, precisa de outra rota ou buscar histórico
-      // Vamos buscar o histórico neste caso para simplificar
-      if (this.state.currentUser.role === 'admin' && targetEmployeeId !== this.state.currentUser.id) {
-        // Buscar o histórico e pegar o registro de hoje manualmente
-        // (Melhor seria ter uma rota /api/time-records/employee/:id/today no backend)
-        console.log(`Admin buscando status de ${targetEmployeeId}. Usando histórico.`);
+      let url = '';
+      // Decide qual endpoint usar
+      if (targetEmployeeId === this.state.currentUser.id) {
+        url = '/api/time-records/today'; // Usuário logado buscando próprio status
+      } else if (this.state.currentUser.role === 'admin') {
+        // Admin buscando status de outro: usa o histórico e filtra
+        console.log(`Admin buscando histórico de ${targetEmployeeId} para status.`);
         await this.fetchHistoryAndFindToday(targetEmployeeId);
-
+        this.updateStatusUI();
+        this.updateActionButtons(); // Atualiza botões após ter o status
+        return; // Sai da função pois já atualizou a UI
       } else {
-        // Busca o registro de hoje do usuário logado
-        const response = await this.fetchWithAuth(url);
-        const result = await response.json();
-
-        if (!response.ok) {
-          if (response.status === 404) { // 404 significa que não há registro hoje
-            this.state.todayRecord = null;
-          } else {
-            throw new Error(result.message || `Erro ${response.status}`);
-          }
-        } else {
-          this.state.todayRecord = result.data; // Armazena o registro de hoje
-        }
+        throw new Error("Não autorizado a ver status de outro funcionário.");
       }
 
+      // Se chegou aqui, está buscando /today para o usuário logado
+      const response = await this.fetchWithAuth(url);
+      const result = await response.json();
 
-      this.updateStatusUI(); // Atualiza o card de status
-      this.updateActionButtons(); // Atualiza o estado dos botões de ponto
+      if (!response.ok) {
+        if (response.status === 404) {
+          console.log(`Nenhum registro hoje para ${targetEmployeeId}`);
+          this.state.todayRecord = null;
+        } else {
+          throw new Error(result.message || `Erro ${response.status}`);
+        }
+      } else {
+        this.state.todayRecord = result.data;
+      }
+
+      this.updateStatusUI();
+      this.updateActionButtons();
 
     } catch (error) {
       console.error(`Erro ao buscar status para employeeId ${targetEmployeeId}:`, error);
       this.showAlert('danger', `Falha ao carregar status: ${error.message}`);
-      this.resetUIState(); // Limpa em caso de erro
+      this.ui.statusPlaceholder.textContent = 'Erro ao carregar status.';
+      this.ui.statusPlaceholder.style.display = 'block';
+      this.ui.statusDetails.style.display = 'none';
+      // Garante que botões fiquem desabilitados em caso de erro
+      this._setPointButtonsDisabled(true);
     }
   }
 
-  // Função auxiliar para admin buscar histórico e extrair o registro de hoje
   async fetchHistoryAndFindToday(employeeId) {
+    this.state.todayRecord = null; // Reseta antes de buscar
     try {
       const response = await this.fetchWithAuth(`/api/time-records/employee/${employeeId}`);
       const result = await response.json();
       if (!response.ok) throw new Error(result.message || `Erro ${response.status}`);
 
       const todayStr = new Date().toISOString().split('T')[0];
-      this.state.todayRecord = result.data.find(record => record.startTime.startsWith(todayStr)) || null;
-      console.log("Registro de hoje encontrado no histórico:", this.state.todayRecord);
+      // Encontra o primeiro registro que começa hoje (pode haver mais de um se houver erro)
+      this.state.todayRecord = result.data.find(record => record.startTime && record.startTime.startsWith(todayStr)) || null;
+      console.log(`Registro de hoje (ID: ${employeeId}) encontrado no histórico:`, this.state.todayRecord);
 
     } catch (error) {
-      console.error(`Erro ao buscar histórico para encontrar registro de hoje (employeeId ${employeeId}):`, error);
+      console.error(`Erro ao buscar histórico (employeeId ${employeeId}):`, error);
       this.showAlert('danger', `Falha ao buscar histórico: ${error.message}`);
-      this.state.todayRecord = null; // Garante que está nulo em caso de erro
+      // Mantém todayRecord como null
     }
   }
 
   updateStatusUI() {
     const record = this.state.todayRecord;
-
     if (!record) {
       this.ui.statusPlaceholder.textContent = 'Nenhum registro encontrado para hoje.';
       this.ui.statusPlaceholder.style.display = 'block';
@@ -364,12 +395,11 @@ class PontoApp {
     } else {
       this.ui.statusPlaceholder.style.display = 'none';
       this.ui.statusDetails.style.display = 'block';
-
+      // Formata os horários
       this.ui.statusEntrada.textContent = this.formatTime(record.startTime);
       this.ui.statusSaidaAlmoco.textContent = this.formatTime(record.lunchStartTime);
       this.ui.statusRetornoAlmoco.textContent = this.formatTime(record.lunchEndTime);
       this.ui.statusSaida.textContent = this.formatTime(record.endTime);
-      // Usa toLocaleString para formatar o número decimal de horas
       this.ui.statusTotalHoras.textContent = record.totalHours
         ? `${parseFloat(record.totalHours).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} h`
         : '-.-- h';
@@ -378,97 +408,60 @@ class PontoApp {
 
   updateActionButtons() {
     const record = this.state.todayRecord;
-    const canPerformActions = this.state.currentUser.role === 'admin' || this.state.selectedEmployeeId === this.state.currentUser.id;
+    // Ações são permitidas SOMENTE se o ID selecionado é o do usuário logado
+    const canPerformActions = this.state.currentUser?.id === this.state.selectedEmployeeId;
 
-    // Habilita/desabilita botões baseado no estado do registro ATUAL
-    // Só permite ações se for admin ou o próprio usuário
-    this.ui.btnEntrada.disabled = !canPerformActions || !!record; // Desabilita se não pode agir ou se já tem registro hoje
-    this.ui.btnSaidaAlmoco.disabled = !canPerformActions || !record || !!record.lunchStartTime || !!record.endTime; // Desabilita se não pode agir, não tem registro, já saiu pro almoço, ou já fez checkout
-    this.ui.btnRetornoAlmoco.disabled = !canPerformActions || !record || !record.lunchStartTime || !!record.lunchEndTime || !!record.endTime; // Desabilita se ..., não saiu pro almoço, já retornou do almoço, ou já fez checkout
-    this.ui.btnSaida.disabled = !canPerformActions || !record || !!record.endTime; // Desabilita se ..., ou já fez checkout
+    // Lógica de habilitação/desabilitação
+    this.ui.btnEntrada.disabled = !canPerformActions || !!record;
+    this.ui.btnSaidaAlmoco.disabled = !canPerformActions || !record || !!record.lunchStartTime || !!record.endTime;
+    this.ui.btnRetornoAlmoco.disabled = !canPerformActions || !record || !record.lunchStartTime || !!record.lunchEndTime || !!record.endTime;
+    this.ui.btnSaida.disabled = !canPerformActions || !record || !!record.endTime;
 
-    // Opcional: Requerer retorno do almoço para poder sair
-    // if (record && record.lunchStartTime && !record.lunchEndTime) {
+    // Opcional: Requerer retorno do almoço para poder fazer check-out
+    // if (canPerformActions && record && record.lunchStartTime && !record.lunchEndTime && !record.endTime) {
     //     this.ui.btnSaida.disabled = true;
     // }
   }
 
-
   async registrarPonto(tipoAcao) {
-    // A ação é sempre para o funcionário selecionado (ou o próprio usuário se não for admin)
-    const targetEmployeeId = this.state.selectedEmployeeId || this.state.currentUser.id;
-
-    // Verifica se o usuário logado pode registrar ponto para o targetEmployeeId
-    if (this.state.currentUser.role !== 'admin' && this.state.currentUser.id !== targetEmployeeId) {
-      this.showAlert('warning', 'Você não tem permissão para registrar ponto para este funcionário.');
+    // Confirma novamente que a ação é para o usuário logado
+    if (this.state.selectedEmployeeId !== this.state.currentUser.id) {
+      this.showAlert('warning', 'Você só pode registrar seu próprio ponto.');
       return;
     }
 
-
-    console.log(`Tentando registrar ${tipoAcao} para employeeId ${targetEmployeeId}`);
+    console.log(`Registrando ${tipoAcao} para usuário logado (ID: ${this.state.currentUser.id})`);
 
     let url = '';
-    const options = { method: 'POST' }; // Body é tratado no backend usando req.user.id
+    const options = { method: 'POST' }; // API usa o token, não precisa de body aqui
 
     switch (tipoAcao) {
       case 'check-in': url = '/api/time-records/check-in'; break;
       case 'lunch-start': url = '/api/time-records/lunch-start'; break;
       case 'lunch-end': url = '/api/time-records/lunch-end'; break;
       case 'check-out': url = '/api/time-records/check-out'; break;
-      default:
-        console.error("Tipo de ação inválida:", tipoAcao);
-        this.showAlert('danger', 'Ação desconhecida.');
-        return;
+      default: this.showAlert('danger', 'Ação desconhecida.'); return;
     }
 
-    // Desabilitar todos os botões durante a requisição para evitar cliques duplos
     this._setPointButtonsDisabled(true);
 
     try {
-      // IMPORTANTE: A API agora usa o token para identificar o usuário.
-      // Se um admin estiver registrando para OUTRO usuário, a API precisa ser ajustada
-      // para aceitar um `employeeId` no corpo E verificar se o requisitante é admin.
-      // Assumindo por enquanto que a API SÓ registra para o usuário do TOKEN.
-      // *** SE ADMIN PRECISA REGISTRAR PARA OUTROS, O BACKEND PRECISA MUDAR ***
-      if (this.state.currentUser.role === 'admin' && targetEmployeeId !== this.state.currentUser.id) {
-        // **ALERTA:** A API atual (checkIn, checkOut, etc.) usa req.user.id.
-        // Para um admin registrar por outro, o backend precisaria:
-        // 1. Aceitar `employeeId` no corpo da requisição POST.
-        // 2. Verificar se `req.user.role === 'admin'`.
-        // 3. Usar o `employeeId` do corpo em vez de `req.user.id`.
-        // COMO ISSO NÃO FOI IMPLEMENTADO NO BACKEND, mostraremos um erro por enquanto.
-        throw new Error("Funcionalidade de registrar ponto para outro usuário não implementada no backend.");
-        // Se fosse implementar, seria algo como:
-        // options.headers = { 'Content-Type': 'application/json' };
-        // options.body = JSON.stringify({ employeeId: targetEmployeeId });
-      }
-
-
       const response = await this.fetchWithAuth(url, options);
       const result = await response.json();
-
-      if (!response.ok || !result.success) {
-        throw new Error(result.message || `Erro ${response.status}`);
-      }
+      if (!response.ok || !result.success) throw new Error(result.message || `Erro ${response.status}`);
 
       this.showAlert('success', `${this.getTipoNome(tipoAcao)} registrado com sucesso!`);
-      // Atualiza o estado e a UI após o sucesso
-      await this.fetchAndUpdateStatus(); // Re-busca o status atualizado
+      await this.fetchAndUpdateStatus(); // Re-busca status para atualizar UI e botões
 
     } catch (error) {
       console.error(`Erro ao registrar ${tipoAcao}:`, error);
-      // Mostra o erro da API ou um erro genérico
-      const displayError = error.message.includes("não implementada no backend")
-        ? error.message // Mostra o erro específico de admin
-        : `Falha ao registrar ${this.getTipoNome(tipoAcao)}: ${error.message}`;
-      this.showAlert('danger', displayError);
-      // Reabilita os botões em caso de erro para permitir nova tentativa
-      this.updateActionButtons(); // Reavalia o estado dos botões baseado no último estado conhecido
-    } finally {
-      // Garante que os botões sejam reavaliados mesmo se a requisição falhar
-      this._setPointButtonsDisabled(false); // Reabilita interação geral
-      this.updateActionButtons(); // Ajusta habilitação baseada no estado atual
+      this.showAlert('danger', `Falha ao registrar ${this.getTipoNome(tipoAcao)}: ${error.message}`);
+      // Re-busca status mesmo em caso de erro para garantir que os botões reflitam o estado real
+      await this.fetchAndUpdateStatus();
     }
+    // finally { // O fetchAndUpdateStatus no try/catch já reavalia os botões
+    //     this._setPointButtonsDisabled(false); // Reabilita interação geral
+    // }
   }
 
   _setPointButtonsDisabled(isDisabled) {
@@ -481,39 +474,34 @@ class PontoApp {
   // ================ GERENCIAMENTO DE FUNCIONÁRIOS (ADMIN) ================
 
   async loadEmployeeListForAdmin() {
-    if (this.state.currentUser.role !== 'admin') return; // Só para admins
+    if (this.state.currentUser?.role !== 'admin') return;
 
     try {
       const response = await this.fetchWithAuth('/api/employees');
       const result = await response.json();
-
-      if (!response.ok || !result.success) {
-        throw new Error(result.message || `Erro ${response.status}`);
-      }
+      if (!response.ok || !result.success) throw new Error(result.message || `Erro ${response.status}`);
 
       this.state.employeeList = result.data;
+      const select = this.ui.employeeSelect;
+      const currentSelection = select.val(); // Salva seleção atual se houver
 
-      // Limpa opções existentes (exceto a placeholder)
-      this.ui.employeeSelect.find('option:not([value=""])').remove();
+      select.empty().append(new Option('', '')); // Adiciona opção vazia para placeholder/clear
 
-      // Adiciona funcionários ao dropdown Select2
       this.state.employeeList.forEach(emp => {
-        const option = new Option(
-          `${emp.fullName} (${emp.role})`, // Texto da opção
-          emp.id,                           // Valor da opção
-          false,                            // Default selected
-          false                             // Selected
-        );
-        // Adicionar dados extras se necessário (ex: foto)
-        // option.dataset.foto = emp.foto_url || 'assets/default-avatar.jpg';
-        this.ui.employeeSelect.append(option);
+        const optionText = `${emp.fullName} (${emp.role})`;
+        const option = new Option(optionText, emp.id, false, false);
+        select.append(option);
       });
 
-      // Dispara o evento change para atualizar o Select2
-      this.ui.employeeSelect.trigger('change');
-
-      // Seleciona o próprio admin por padrão, se desejar
-      // this.ui.employeeSelect.val(this.state.currentUser.id).trigger('change');
+      // Restaura seleção anterior ou seleciona o próprio admin
+      if (currentSelection && this.state.employeeList.some(e => e.id == currentSelection)) {
+        select.val(currentSelection);
+      } else {
+        // Seleciona o próprio admin por padrão após carregar a lista
+        select.val(this.state.currentUser.id);
+        this.state.selectedEmployeeId = this.state.currentUser.id; // Atualiza estado
+      }
+      select.trigger('change.select2'); // Notifica o select2 da mudança
 
 
     } catch (error) {
@@ -524,205 +512,128 @@ class PontoApp {
 
   _validateNewEmployeeForm() {
     const form = this.ui.formNovoFuncionario;
-    let isValid = true;
-
-    // Nome Completo
-    if (!form.fullName.checkValidity()) {
-      form.fullName.classList.add('is-invalid'); // Adiciona classe do Bootstrap
-      isValid = false;
-    } else {
-      form.fullName.classList.remove('is-invalid');
-    }
-
-    // Email
-    if (!form.email.checkValidity()) {
-      form.email.classList.add('is-invalid');
-      isValid = false;
-    } else {
-      form.email.classList.remove('is-invalid');
-    }
-
-    // Senha
-    if (!form.password.checkValidity()) {
-      form.password.classList.add('is-invalid');
-      isValid = false;
-    } else {
-      form.password.classList.remove('is-invalid');
-    }
-
-    // Cargo (Role)
-    if (!form.role.checkValidity()) {
-      form.role.classList.add('is-invalid');
-      isValid = false;
-    } else {
-      form.role.classList.remove('is-invalid');
-    }
-
-    // Carga Horária (opcional, mas valida se preenchido)
-    if (form.weeklyHours.value && !form.weeklyHours.checkValidity()) {
-      form.weeklyHours.classList.add('is-invalid');
-      isValid = false;
-    } else {
-      form.weeklyHours.classList.remove('is-invalid');
-    }
-
-
-    return isValid;
+    // Usa o método reportValidity() do form para mostrar feedback nativo/bootstrap
+    // e retorna true/false indicando a validade geral.
+    // A classe 'was-validated' precisa estar no form para o feedback aparecer.
+    form.classList.add('was-validated'); // Garante que a validação visual seja mostrada
+    return form.checkValidity();
   }
 
-
   async handleSaveNewEmployee() {
-    // Adiciona classe para mostrar feedback de validação do Bootstrap
-    this.ui.formNovoFuncionario.classList.add('was-validated');
-
     if (!this._validateNewEmployeeForm()) {
       this.ui.novoFuncError.textContent = 'Por favor, corrija os campos inválidos.';
       this.ui.novoFuncError.style.display = 'block';
       return;
     }
-
-    // Limpa erro anterior
     this.ui.novoFuncError.style.display = 'none';
-
 
     const formData = new FormData(this.ui.formNovoFuncionario);
     const data = Object.fromEntries(formData.entries());
+    if (data.weeklyHours) { data.weeklyHours = parseFloat(data.weeklyHours); }
+    else { delete data.weeklyHours; }
 
-    // Converte weeklyHours para número ou remove se vazio
-    if (data.weeklyHours) {
-      data.weeklyHours = parseFloat(data.weeklyHours);
-    } else {
-      delete data.weeklyHours; // Deixa o backend usar o default
-    }
-
-
-    console.log("Salvando novo funcionário:", data);
-
-    // Desabilitar botão durante a requisição
     this.ui.btnSalvarFuncionario.disabled = true;
     this.ui.btnSalvarFuncionario.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Salvando...';
 
     try {
       const response = await this.fetchWithAuth('/api/employees', {
         method: 'POST',
-        body: JSON.stringify(data) // Envia os dados corretos
+        body: JSON.stringify(data)
       });
-
       const result = await response.json();
-
       if (!response.ok || !result.success) {
-        // Tenta pegar o campo específico do erro (se o backend enviar)
         const fieldError = result.error?.field ? ` (Campo: ${result.error.field})` : '';
         throw new Error((result.message || `Erro ${response.status}`) + fieldError);
       }
 
       this.showAlert('success', 'Funcionário cadastrado com sucesso!');
-      this.ui.novoFuncionarioModal.hide(); // Fecha o modal
-      this.loadEmployeeListForAdmin(); // Recarrega a lista no dropdown
+      this.ui.novoFuncionarioModal.hide();
+      this.loadEmployeeListForAdmin(); // Recarrega lista
 
     } catch (error) {
       console.error("Erro ao cadastrar funcionário:", error);
       this.ui.novoFuncError.textContent = `Erro: ${error.message}`;
       this.ui.novoFuncError.style.display = 'block';
     } finally {
-      // Reabilitar botão
       this.ui.btnSalvarFuncionario.disabled = false;
       this.ui.btnSalvarFuncionario.innerHTML = 'Salvar Funcionário';
     }
   }
 
-
   // ================ UTILITÁRIOS ================
 
-  /**
-   * Função wrapper para fetch que inclui o token JWT automaticamente.
-   */
   async fetchWithAuth(url, options = {}) {
-    const headers = {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    };
-
-    if (this.state.token) {
-      headers['Authorization'] = `Bearer ${this.state.token}`;
-    } else {
-      console.warn("fetchWithAuth chamado sem token.");
-      // Poderia redirecionar para login aqui ou lançar erro específico
-      // throw new Error("Usuário não autenticado.");
-    }
+    const headers = { 'Content-Type': 'application/json', ...options.headers };
+    if (this.state.token) { headers['Authorization'] = `Bearer ${this.state.token}`; }
+    else { console.warn("fetchWithAuth chamado sem token."); /* Considerar lançar erro ou redirecionar */ }
 
     const response = await fetch(url, { ...options, headers });
 
-    // Tratamento global para erros de autenticação/autorização
-    if (response.status === 401) { // Não autorizado (token inválido, expirado ou ausente)
-      console.error("Erro 401 - Não autorizado. Deslogando...");
-      this.showAlert('danger', 'Sessão inválida ou expirada. Por favor, faça login novamente.');
-      this.handleLogout(); // Força o logout
-      throw new Error('Não autorizado'); // Interrompe a execução da chamada original
+    if (response.status === 401) {
+      console.error("Erro 401 - Não autorizado detectado pelo fetchWithAuth. Deslogando...");
+      this.showAlert('danger', 'Sessão inválida ou expirada. Faça login novamente.');
+      this.handleLogout();
+      // Lança um erro para interromper a promessa da chamada original
+      return Promise.reject(new Error('Não autorizado'));
+      // Alternativamente, retornar a resposta para tratamento local: return response;
     }
-    if (response.status === 403) { // Proibido (autenticado mas sem permissão)
-      console.error("Erro 403 - Acesso Proibido.");
-      // Não desloga, mas informa o usuário
-      throw new Error('Acesso proibido para esta operação.');
-    }
-
-
-    return response;
+    // if (response.status === 403) { // Proibido
+    //     console.error("Erro 403 - Acesso Proibido.");
+    //     // Lança um erro ou retorna a resposta para tratamento específico
+    //      return Promise.reject(new Error('Acesso proibido'));
+    //     // Alternativamente: return response;
+    // }
+    return response; // Retorna a resposta para tratamento posterior
   }
 
-  /**
-   * Mostra um alerta temporário na tela.
-   * @param {'primary'|'secondary'|'success'|'danger'|'warning'|'info'|'light'|'dark'} type
-   * @param {string} message
-   */
   showAlert(type, message) {
     const wrapper = document.createElement('div');
+    // Usa um ID único para poder remover o alerta específico se necessário
+    const alertId = `alert-${Date.now()}`;
     wrapper.innerHTML = `
-          <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+          <div id="${alertId}" class="alert alert-${type} alert-dismissible fade show" role="alert">
               ${message}
               <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
           </div>
       `;
+    // Adiciona ao placeholder
     this.ui.alertPlaceholder.append(wrapper);
 
-    // Auto-fecha após 5 segundos
-    setTimeout(() => {
-      const alert = wrapper.querySelector('.alert');
-      if (alert) {
-        bootstrap.Alert.getOrCreateInstance(alert).close();
-      }
-      // Remove o wrapper após o fechamento para não acumular divs vazias
-      setTimeout(() => wrapper.remove(), 500); // Espera a animação de fade out
-    }, 5000);
+    // Tenta pegar a instância do Alerta Bootstrap recém-criado
+    const alertElement = document.getElementById(alertId);
+    if (alertElement) {
+      const bsAlert = bootstrap.Alert.getOrCreateInstance(alertElement);
+      // Auto-fecha após 5 segundos
+      setTimeout(() => {
+        bsAlert.close();
+        // O evento 'closed.bs.alert' pode ser usado para remover o wrapper do DOM
+        alertElement.addEventListener('closed.bs.alert', () => {
+          wrapper.remove();
+        });
+      }, 5000);
+    } else {
+      console.error("Não foi possível encontrar o elemento do alerta para auto-fechamento.")
+      // Fallback para remover o wrapper diretamente (sem animação de fade)
+      setTimeout(() => wrapper.remove(), 5500);
+    }
   }
 
-  /** Formata timestamp (Date ou string ISO) para HH:MM */
   formatTime(timestamp) {
     if (!timestamp) return '--:--';
     try {
       const date = new Date(timestamp);
-      // Verifica se a data é válida
       if (isNaN(date.getTime())) return 'Inválido';
       return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', hour12: false });
-    } catch (e) {
-      console.error("Erro ao formatar data:", timestamp, e);
-      return 'Erro';
-    }
+    } catch (e) { return 'Erro'; }
   }
 
-  /** Retorna nome amigável para o tipo de ação */
   getTipoNome(tipo) {
-    const nomes = {
-      'check-in': 'Entrada',
-      'lunch-start': 'Saída Almoço',
-      'lunch-end': 'Retorno Almoço',
-      'check-out': 'Saída'
-    };
+    const nomes = { 'check-in': 'Entrada', 'lunch-start': 'Saída Almoço', 'lunch-end': 'Retorno Almoço', 'check-out': 'Saída' };
     return nomes[tipo] || tipo;
   }
 }
 
-// Inicializa a aplicação quando o DOM estiver pronto
+// Inicializa a aplicação
 document.addEventListener('DOMContentLoaded', () => {
-  window.pontoApp = new PontoApp(); // Cria a instância global (ou local se preferir)
+  window.pontoApp = new PontoApp();
 });
