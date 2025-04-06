@@ -3,15 +3,15 @@ const { sequelize } = require('../config/database'); // Confirme o caminho
 const bcrypt = require('bcryptjs');
 
 const Employee = sequelize.define('Employee', {
-    id: { // Adicionar ID explicitamente é uma boa prática
+    id: {
         type: DataTypes.INTEGER,
         autoIncrement: true,
         primaryKey: true
     },
-    fullName: { // Nome correto do campo
-        type: DataTypes.STRING,
+    fullName: {
+        type: DataTypes.STRING(100), // Adicionado limite
         allowNull: false,
-        field: 'full_name', // Convenção snake_case para o banco
+        field: 'full_name',
         validate: {
             notEmpty: { msg: 'Nome completo é obrigatório.' },
             len: {
@@ -28,85 +28,105 @@ const Employee = sequelize.define('Employee', {
             isEmail: { msg: 'Formato de e-mail inválido.' }
         }
     },
-    passwordHash: { // Nome correto do campo
+    passwordHash: {
         type: DataTypes.STRING,
         allowNull: false,
-        field: 'password_hash' // Convenção snake_case para o banco
-        // Não adicione validação de tamanho aqui, o hash tem tamanho fixo/variável
+        field: 'password_hash'
     },
     role: {
-        type: DataTypes.STRING,
-        allowNull: false, // É bom ter um papel padrão, então não deve ser nulo
-        defaultValue: 'employee', // Papel padrão
+        type: DataTypes.STRING(50), // Adicionado limite
+        allowNull: false,
+        defaultValue: 'employee',
         validate: {
-            isIn: { // Garante que o papel seja um dos valores permitidos
-                args: [['admin', 'employee', 'manager']], // Sincronizado com validation.middleware
-                msg: 'Papel inválido.'
+            isIn: {
+                args: [['admin', 'employee', 'manager']],
+                msg: 'Papel inválido. Use admin, employee ou manager.'
             }
         }
     },
     weeklyHours: {
-        type: DataTypes.DECIMAL(10, 2), // DECIMAL é bom para horas (ex: 40.5)
-        allowNull: true, // Pode ser nulo se não for obrigatório para todos
+        type: DataTypes.DECIMAL(10, 2),
+        allowNull: false, // Tornar obrigatório ter uma carga horária definida
         defaultValue: 44.0,
-        field: 'weekly_hours', // Convenção snake_case
+        field: 'weekly_hours',
         validate: {
-            min: {
-                args: [10],
-                msg: 'Carga horária semanal mínima é 10 horas.'
-            },
-            max: {
-                args: [60],
-                msg: 'Carga horária semanal máxima é 60 horas.'
-            }
+            min: { args: [10], msg: 'Carga horária semanal mínima é 10 horas.' },
+            max: { args: [60], msg: 'Carga horária semanal máxima é 60 horas.' },
+            notNull: { msg: 'Carga horária semanal é obrigatória.' } // Validação explícita
         }
+    },
+    // --- Novos Campos ---
+    birthDate: {
+        type: DataTypes.DATEONLY, // Usar DATEONLY para não armazenar hora/fuso
+        allowNull: true,          // Pode ser opcional
+        field: 'birth_date'
+    },
+    hireDate: {
+        type: DataTypes.DATEONLY, // Usar DATEONLY
+        allowNull: true,          // Pode ser opcional
+        field: 'hire_date'
+    },
+    photoUrl: {
+        type: DataTypes.STRING(2048), // URL pode ser longa
+        allowNull: true,
+        field: 'photo_url',
+        validate: {
+            isUrl: { msg: 'URL da foto inválida.' } // Valida se é uma URL (opcional)
+        }
+    },
+    hourBalance: {
+        type: DataTypes.DECIMAL(10, 2), // Saldo pode ser negativo
+        allowNull: false,
+        defaultValue: 0.0,
+        field: 'hour_balance'
+    },
+    isActive: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: true, // Funcionário começa ativo
+        field: 'is_active'
     }
+    // createdAt e updatedAt são adicionados automaticamente por timestamps: true
 }, {
     tableName: 'employees',
-    timestamps: true, // Habilita createdAt e updatedAt por padrão
-    underscored: true, // Mapeia camelCase para snake_case automaticamente (opcional, mas útil com os 'field' definidos)
+    timestamps: true,
+    underscored: true, // Mapeia camelCase (ex: weeklyHours) para snake_case (ex: weekly_hours)
     hooks: {
-        // Hook para hashear a senha ANTES de criar ou atualizar o funcionário
         beforeSave: async (employee, options) => {
-            // Só hashear se a senha foi modificada (ou é nova)
-            // `employee.changed('passwordHash')` verifica se o campo foi alterado
-            // `employee.isNewRecord` verifica se é um novo registro
-            // No seu controller, você passa a senha em texto plano para 'passwordHash'
-            // então precisamos garantir que ela seja sempre hasheada se presente.
-            // A lógica original está ok se você sempre define `passwordHash` com a senha em texto plano no `create`.
-            if (employee.passwordHash && (employee.isNewRecord || employee.changed('passwordHash'))) {
-                try {
-                    const saltRounds = 10; // Fator de custo para o hash
-                    employee.passwordHash = await bcrypt.hash(employee.passwordHash, saltRounds);
-                } catch (error) {
-                    console.error("Erro ao hashear senha:", error);
-                    throw new Error("Erro ao processar a senha."); // Impede salvar se o hash falhar
+            // Hashear senha apenas se for nova ou modificada
+            if (employee.changed('passwordHash') || employee.isNewRecord) {
+                // Verifica se o valor não é nulo ou vazio antes de hashear
+                if (employee.passwordHash) {
+                    try {
+                        const saltRounds = 10;
+                        employee.passwordHash = await bcrypt.hash(employee.passwordHash, saltRounds);
+                    } catch (error) {
+                        console.error("Erro ao hashear senha:", error);
+                        throw new Error("Erro ao processar a senha.");
+                    }
+                } else {
+                    // Lançar erro se tentar salvar senha vazia (se for obrigatória)
+                    if (employee.isNewRecord) throw new Error("Senha é obrigatória para novo funcionário.");
+                    // Se for update, não faz nada (assume que não quer mudar a senha)
                 }
             }
         }
-        // Removido beforeCreate, pois beforeSave cobre criação e atualização
-        // beforeCreate: async (employee) => {
-        //     if (employee.passwordHash) {
-        //         employee.passwordHash = await bcrypt.hash(employee.passwordHash, 10);
-        //     }
-        // }
     }
 });
 
-// Método para verificar senha na instância do modelo
+// Método para verificar senha (mantido)
 Employee.prototype.verifyPassword = async function (password) {
-    // Compara a senha fornecida com o hash armazenado
-    // Retorna true se a senha for válida, false caso contrário
-    if (!password || !this.passwordHash) {
-        return false; // Não pode comparar se um dos dois não existe
-    }
+    if (!password || !this.passwordHash) return false;
     try {
         return await bcrypt.compare(password, this.passwordHash);
     } catch (error) {
         console.error("Erro ao comparar senha:", error);
-        return false; // Retorna falso em caso de erro na comparação
+        return false;
     }
 };
+
+// Relação com TimeRecord (mantida)
+// Employee.hasMany(TimeRecord, { foreignKey: 'employeeId', as: 'timeRecords' }); // Definido no time-record.model.js
 
 // Exporta o modelo configurado
 module.exports = { Employee };
