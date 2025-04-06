@@ -5,10 +5,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Controle de Ponto | Empresa XYZ</title>
+    <!-- CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css"> <!-- Seu CSS customizado -->
 </head>
 
 <body>
@@ -16,8 +17,11 @@
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark sticky-top shadow-sm">
         <div class="container-fluid">
             <a class="navbar-brand" href="#">
+                <!-- Garanta que o caminho/arquivo exista em 'src/views/assets/' -->
                 <img src="assets/company-logo.png" alt="Logo" width="30" height="30"
-                    class="d-inline-block align-top me-2"> Banco de Horas
+                    class="d-inline-block align-top me-2" onerror="this.style.display='none'">
+                <!-- Oculta se não carregar -->
+                Banco de Horas
             </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
                 aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
@@ -25,15 +29,18 @@
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto align-items-center">
-                    <!-- Links do Menu (Visíveis após login) -->
+                    <!-- Links Comuns (Visíveis após login) -->
                     <li class="nav-item" id="navLinks" style="display: none;">
                         <a class="nav-link" href="#" id="linkMeuPerfil"><i class="fas fa-user me-1"></i>Meu Perfil</a>
                     </li>
+                    <!-- Links Admin (Visíveis após login como admin) -->
                     <li class="nav-item" id="navAdminLinks" style="display: none;">
                         <a class="nav-link" href="#" id="linkGerenciarFuncionarios"><i
-                                class="fas fa-users-cog me-1"></i>Gerenciar Funcionários</a>
-                        <a class="nav-link" href="#" data-bs-toggle="modal" data-bs-target="#novoFuncionarioModal"><i
-                                class="fas fa-user-plus me-1"></i>Novo Funcionário</a>
+                                class="fas fa-users-cog me-1"></i>Gerenciar</a>
+                        <!-- Botão para abrir modal de novo funcionário -->
+                        <a class="nav-link" href="#" id="linkNovoFuncionario" data-bs-toggle="modal"
+                            data-bs-target="#employeeFormModal"><i class="fas fa-user-plus me-1"></i>Novo
+                            Funcionário</a>
                     </li>
                     <!-- Área de Login/Logout -->
                     <li class="nav-item ms-lg-2" id="authArea">
@@ -52,7 +59,6 @@
         <!-- Área de Dashboard (Visível após login) -->
         <div id="dashboardArea" style="display: none;">
             <div class="row g-4">
-
                 <!-- Coluna Esquerda: Ações e Status -->
                 <div class="col-lg-7 col-md-6">
                     <!-- Card de Registro de Ponto -->
@@ -119,7 +125,6 @@
                         </div>
                     </div>
                 </div>
-
                 <!-- Coluna Direita: Resumo/Saldo -->
                 <div class="col-lg-5 col-md-6">
                     <div class="card shadow-sm">
@@ -135,11 +140,9 @@
                                     <small id="summaryBalanceHint" class="text-muted">(Saldo acumulado)</small>
                                 </div>
                                 <hr>
-                                <!-- Outras informações podem ir aqui (ex: resumo semanal) -->
                                 <div class="d-grid">
-                                    <button class="btn btn-outline-primary" id="btnVerPerfilCompleto">
-                                        <i class="fas fa-user-circle me-2"></i>Ver Perfil Completo e Histórico
-                                    </button>
+                                    <button class="btn btn-outline-primary" id="btnVerPerfilCompleto"><i
+                                            class="fas fa-user-circle me-2"></i>Ver Perfil Completo e Histórico</button>
                                 </div>
                             </div>
                         </div>
@@ -166,7 +169,6 @@
                                 </tr>
                             </thead>
                             <tbody id="employeeListTableBody">
-                                <!-- Linhas serão preenchidas via JS -->
                                 <tr>
                                     <td colspan="6" class="text-center">Carregando funcionários...</td>
                                 </tr>
@@ -184,15 +186,36 @@
             <button class="btn btn-primary btn-lg" data-bs-toggle="modal" data-bs-target="#loginModal"><i
                     class="fas fa-sign-in-alt me-1"></i> Fazer Login</button>
         </div>
-
     </div> <!-- Fim .container-fluid -->
 
     <!-- ========= MODAIS ========= -->
 
-    <!-- Modal de Login (sem alterações) -->
-    <div class="modal fade" id="loginModal" tabindex="-1" aria-labelledby="loginModalLabel" aria-hidden="true">...</div>
+    <!-- Modal de Login -->
+    <div class="modal fade" id="loginModal" tabindex="-1" aria-labelledby="loginModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="loginModalLabel">Login</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="loginForm">
+                        <div class="mb-3"><label for="loginEmail" class="form-label">E-mail</label><input type="email"
+                                class="form-control" id="loginEmail" name="email" required autocomplete="email"></div>
+                        <div class="mb-3"><label for="loginPassword" class="form-label">Senha</label><input
+                                type="password" class="form-control" id="loginPassword" name="password" required
+                                autocomplete="current-password"></div>
+                        <div class="alert alert-danger mt-3" role="alert" id="loginError" style="display: none;"></div>
+                    </form>
+                </div>
+                <div class="modal-footer"><button type="button" class="btn btn-secondary"
+                        data-bs-dismiss="modal">Cancelar</button><button type="button" class="btn btn-primary"
+                        id="btnLoginSubmit">Entrar</button></div>
+            </div>
+        </div>
+    </div>
 
-    <!-- Modal de Cadastro/Edição de Funcionário (Adaptado para Edição também) -->
+    <!-- Modal de Cadastro/Edição de Funcionário -->
     <div class="modal fade" id="employeeFormModal" tabindex="-1" aria-labelledby="employeeFormModalLabel"
         aria-hidden="true">
         <div class="modal-dialog">
@@ -203,36 +226,30 @@
                 </div>
                 <div class="modal-body">
                     <form id="employeeForm" novalidate>
-                        <input type="hidden" id="employeeId" name="id"> <!-- Campo oculto para ID na edição -->
+                        <input type="hidden" id="employeeId" name="id">
                         <div id="employeeFormError" class="alert alert-danger" style="display: none;"></div>
-                        <!-- Campos do formulário -->
-                        <div class="mb-3">
-                            <label for="employeeFullName" class="form-label">Nome Completo <span
-                                    class="text-danger">*</span></label>
-                            <input type="text" class="form-control" id="employeeFullName" name="fullName" required
-                                minlength="3" maxlength="100">
+                        <div class="mb-3"><label for="employeeFullName" class="form-label">Nome Completo <span
+                                    class="text-danger">*</span></label><input type="text" class="form-control"
+                                id="employeeFullName" name="fullName" required minlength="3" maxlength="100">
                             <div class="invalid-feedback">Nome completo (3-100 caracteres).</div>
                         </div>
-                        <div class="mb-3">
-                            <label for="employeeEmail" class="form-label">E-mail <span
-                                    class="text-danger">*</span></label>
-                            <input type="email" class="form-control" id="employeeEmail" name="email" required>
+                        <div class="mb-3"><label for="employeeEmail" class="form-label">E-mail <span
+                                    class="text-danger">*</span></label><input type="email" class="form-control"
+                                id="employeeEmail" name="email" required>
                             <div class="invalid-feedback">Forneça um e-mail válido.</div>
                         </div>
-                        <!-- Campo Senha (Opcional na Edição) -->
-                        <div class="mb-3" id="passwordFieldContainer">
-                            <label for="employeePassword" class="form-label">Senha</label>
-                            <input type="password" class="form-control" id="employeePassword" name="password"
-                                minlength="6" placeholder="Deixe em branco para não alterar">
-                            <div class="invalid-feedback">Senha deve ter pelo menos 6 caracteres.</div>
-                            <small id="passwordHelp" class="form-text text-muted">Obrigatório para novos
+                        <div class="mb-3" id="passwordFieldContainer"><label for="employeePassword"
+                                class="form-label">Senha</label><input type="password" class="form-control"
+                                id="employeePassword" name="password" minlength="6"
+                                placeholder="Deixe em branco para não alterar">
+                            <div class="invalid-feedback">Senha deve ter pelo menos 6 caracteres.</div><small
+                                id="passwordHelp" class="form-text text-muted">Obrigatório para novos
                                 funcionários.</small>
                         </div>
                         <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label for="employeeRole" class="form-label">Cargo <span
-                                        class="text-danger">*</span></label>
-                                <select class="form-select" id="employeeRole" name="role" required>
+                            <div class="col-md-6 mb-3"><label for="employeeRole" class="form-label">Cargo <span
+                                        class="text-danger">*</span></label><select class="form-select"
+                                    id="employeeRole" name="role" required>
                                     <option value="" disabled>Selecione...</option>
                                     <option value="employee">Colaborador</option>
                                     <option value="manager">Gerente</option>
@@ -240,36 +257,31 @@
                                 </select>
                                 <div class="invalid-feedback">Selecione um cargo.</div>
                             </div>
-                            <div class="col-md-6 mb-3">
-                                <label for="employeeWeeklyHours" class="form-label">Carga Horária Sem. <span
-                                        class="text-danger">*</span></label>
-                                <input type="number" step="0.5" class="form-control" id="employeeWeeklyHours"
-                                    name="weeklyHours" required min="10" max="60" placeholder="Ex: 44">
+                            <div class="col-md-6 mb-3"><label for="employeeWeeklyHours" class="form-label">Carga Horária
+                                    Sem. <span class="text-danger">*</span></label><input type="number" step="0.5"
+                                    class="form-control" id="employeeWeeklyHours" name="weeklyHours" required min="10"
+                                    max="60" placeholder="Ex: 44">
                                 <div class="invalid-feedback">Carga (10-60).</div>
                             </div>
                         </div>
                         <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label for="employeeBirthDate" class="form-label">Data Nasc.</label>
-                                <input type="date" class="form-control" id="employeeBirthDate" name="birthDate">
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label for="employeeHireDate" class="form-label">Data Admissão</label>
-                                <input type="date" class="form-control" id="employeeHireDate" name="hireDate">
-                            </div>
+                            <div class="col-md-6 mb-3"><label for="employeeBirthDate" class="form-label">Data
+                                    Nasc.</label><input type="date" class="form-control" id="employeeBirthDate"
+                                    name="birthDate"></div>
+                            <div class="col-md-6 mb-3"><label for="employeeHireDate" class="form-label">Data
+                                    Admissão</label><input type="date" class="form-control" id="employeeHireDate"
+                                    name="hireDate"></div>
                         </div>
-                        <div class="mb-3">
-                            <label for="employeePhotoUrl" class="form-label">URL da Foto</label>
-                            <input type="url" class="form-control" id="employeePhotoUrl" name="photoUrl"
+                        <div class="mb-3"><label for="employeePhotoUrl" class="form-label">URL da Foto</label><input
+                                type="url" class="form-control" id="employeePhotoUrl" name="photoUrl"
                                 placeholder="https://...">
                             <div class="invalid-feedback">Forneça uma URL válida.</div>
                         </div>
                     </form>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="button" class="btn btn-primary" id="btnSaveChangesEmployee">Salvar Alterações</button>
-                </div>
+                <div class="modal-footer"><button type="button" class="btn btn-secondary"
+                        data-bs-dismiss="modal">Cancelar</button><button type="button" class="btn btn-primary"
+                        id="btnSaveChangesEmployee">Salvar Alterações</button></div>
             </div>
         </div>
     </div>
@@ -284,28 +296,28 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body" id="profileModalBody">
-                    <!-- Conteúdo Carregado via JS -->
-                    <div class="text-center">Carregando perfil...</div>
+                    <div class="text-center p-5"><span class="spinner-border spinner-border-sm"></span> Carregando...
+                    </div>
                 </div>
                 <div class="modal-footer">
-                    <!-- Botões de ação do perfil (visíveis para admin) -->
-                    <div id="profileAdminActions" style="display: none;">
-                        <button type="button" class="btn btn-warning btn-sm" id="btnEditProfile"><i
-                                class="fas fa-edit me-1"></i> Editar Perfil</button>
-                        <button type="button" class="btn btn-danger btn-sm" id="btnToggleActiveStatus"><i
-                                class="fas fa-power-off me-1"></i> Desativar</button>
-                    </div>
+                    <div id="profileAdminActions" style="display: none;"><button type="button"
+                            class="btn btn-warning btn-sm" id="btnEditProfile"><i class="fas fa-edit me-1"></i> Editar
+                            Perfil</button><button type="button" class="btn btn-danger btn-sm"
+                            id="btnToggleActiveStatus"><i class="fas fa-power-off me-1"></i> Desativar</button></div>
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
                 </div>
             </div>
         </div>
     </div>
 
-
     <!-- Scripts -->
+    <!-- 1. jQuery (Se Select2 ou algum componente Bootstrap antigo precisar) -->
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <!-- 2. Bootstrap Bundle (Inclui Popper) -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- 3. Select2 -->
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    <!-- 4. Seu script personalizado POR ÚLTIMO -->
     <script src="script.js"></script>
 </body>
 
