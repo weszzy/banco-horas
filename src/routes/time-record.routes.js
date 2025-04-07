@@ -1,9 +1,10 @@
+// src/routes/time-record.routes.js
 const express = require('express');
 const router = express.Router();
 const timeRecordController = require('../controllers/time-record.controller');
 const { authenticate } = require('../middlewares/auth.middleware'); // Middleware de autenticação
 
-// === ROTAS PARA REGISTRO DE PONTO ===
+// === ROTAS PARA /api/time-records ===
 
 // Aplicar autenticação a todas as rotas abaixo, pois todas exigem um usuário logado
 router.use(authenticate);
@@ -23,9 +24,13 @@ router.post('/check-out', timeRecordController.checkOut);
 // Obter o registro de ponto de HOJE para o usuário logado
 router.get('/today', timeRecordController.getTodaysRecord);
 
-// Obter o HISTÓRICO de registros para um funcionário específico (ID na URL)
+// Obter o HISTÓRICO SIMPLES de registros para um funcionário específico (ID na URL)
 // A verificação de permissão (admin vs próprio usuário) é feita no controller
 router.get('/employee/:employeeId', timeRecordController.getHistory);
 
+// Obter o HISTÓRICO COM SALDO CALCULADO para um funcionário específico (ID na URL)
+// Acesso verificado no controller. Recebe query params opcionais startDate e endDate.
+router.get('/employee/:employeeId/balance-history', timeRecordController.getBalanceHistory);
+// ----------------------
 
-module.exports = router;
+module.exports = router; // Exporta o router configurado
