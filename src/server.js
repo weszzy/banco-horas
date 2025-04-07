@@ -1,51 +1,54 @@
-// src/server.js
-require('dotenv').config({ path: require('path').resolve(__dirname, '../.env') }); // Carrega .env da raiz
+require('dotenv').config({ path: require('path').resolve(__dirname, '../.env') });
 const express = require('express');
 const helmet = require('helmet'); // Importa o helmet
 const rateLimit = require('express-rate-limit');
 const cors = require('cors');
 const path = require('path');
-const logger = require('./utils/logger.util'); // Logger
-const errorHandler = require('./middlewares/error.middleware'); // Handler de erro
-const { sequelize } = require('./config/database'); // Instância Sequelize
+const logger = require('./utils/logger.util');
+const errorHandler = require('./middlewares/error.middleware');
+const { sequelize } = require('./config/database');
 
 const app = express();
 
-// --- Confiar no Proxy Reverso (Render) ---
-// IMPORTANTE: Definir ANTES de middlewares que usam req.ip ou relacionados (como rate-limit)
-// Define 'trust proxy' para que o Express confie no cabeçalho X-Forwarded-For
-// enviado por proxies reversos como o do Render, permitindo que req.ip retorne
-// o IP original do cliente. O '1' significa confiar no primeiro proxy da cadeia.
-app.set('trust proxy', 1);
-// Para mais detalhes sobre 'trust proxy', veja: https://expressjs.com/en/guide/behind-proxies.html
-logger.info("Configuração 'trust proxy' definida como 1."); // Log para confirmar a configuração
+app.set('trust proxy', 1); // Confia no primeiro proxy (Render)
+logger.info("Configuração 'trust proxy' definida como 1.");
 
 // --- Configuração de Segurança Essencial ---
-
-// Configura o Helmet com uma CSP personalizada para permitir CDNs
 app.use(
     helmet({
         contentSecurityPolicy: {
             directives: {
-                ...helmet.contentSecurityPolicy.getDefaultDirectives(), // Começa com os padrões do helmet
-                // Permite scripts do próprio domínio ('self') E das CDNs usadas
+                ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+                // PERMITIR SCRIPTS: Próprio domínio e CDNs necessários
                 "script-src": ["'self'", "code.jquery.com", "cdn.jsdelivr.net"],
-                // Permite estilos próprios, inline (Bootstrap pode precisar), e CDNs de CSS
+                // PERMITIR ESTILOS: Próprio domínio, inline (para compatibilidade), e CDNs de CSS
                 "style-src": ["'self'", "'unsafe-inline'", "cdn.jsdelivr.net", "cdnjs.cloudflare.com"],
-                // Permite fontes próprias e do FontAwesome CDN
+                // PERMITIR FONTES: Próprio domínio e FontAwesome CDN
                 "font-src": ["'self'", "cdnjs.cloudflare.com"],
-                // Permite imagens próprias e data URIs (útil para imagens embutidas)
-                "img-src": ["'self'", "data:"],
-                // Conexões de WebSocket (se usar no futuro)
-                // "connect-src": ["'self'"],
+                // --- ALTERAÇÃO AQUI ---
+                // PERMITIR IMAGENS: Próprio domínio, data URIs, E o domínio do Twitter (pbs.twimg.com)
+                // Adicione outros domínios de imagem aqui se necessário (ex: 'img.seu-storage.com')
+                "img-src": ["'self'", "data:", "pbs.twimg.com"],
+                // --- ALTERAÇÃO AQUI ---
+                // PERMITIR ATRIBUTOS INLINE (como onerror): Adiciona 'unsafe-inline'.
+                // ATENÇÃO: Isso é menos seguro. Idealmente, remova handlers inline.
+                // Se 'unsafe-inline' não funcionar para atributos, pode precisar remover 'script-src-attr'
+                // ou configurá-lo especificamente se o Helmet permitir. Vamos tentar 'unsafe-inline' primeiro
+                // no script-src, pois às vezes ele cobre atributos também, dependendo da versão/config.
+                // Atualização: Helmet mais recente usa script-src-attr. Vamos tentar permitir unsafe-inline nele.
+                "script-src-attr": ["'unsafe-inline'"], // Tenta permitir handlers inline como onerror
+
+                // Manter outras diretivas padrão ou ajustar conforme necessário
+                "connect-src": ["'self'"], // Permite fetch para o próprio domínio
             },
         },
-        // Outras opções do Helmet podem ser desabilitadas se causarem problemas:
-        // crossOriginEmbedderPolicy: false, // Exemplo
-        // crossOriginOpenerPolicy: false, // Exemplo
+        // Desabilitar outros headers se necessário (raramente preciso)
+        // crossOriginEmbedderPolicy: false,
+        // crossOriginOpenerPolicy: false,
     })
 );
-logger.info("Middleware Helmet (com CSP customizada) configurado.");
+logger.info("Middleware Helmet (com CSP atualizada para imagens e atributos) configurado.");
+
 
 // Configura CORS para permitir origens específicas ou todas
 app.use(cors({
