@@ -120,6 +120,18 @@ class PontoApp {
   // Listeners para elementos que SEMPRE existem no HTML inicial
   _setupStaticEventListeners() {
     console.log("[Listeners] Setting up static event listeners...");
+    if (this.ui.btnVerPerfilCompleto) {
+      this.ui.btnVerPerfilCompleto.addEventListener('click', () => {
+        // <<< LOG ADICIONADO AQUI >>>
+        console.log("[Listeners] Botão 'Ver Perfil Completo' (estático) CLICADO!");
+        const targetId = this.state.selectedEmployeeId || this.state.currentUser?.id;
+        console.log("[Listeners] Target ID para perfil:", targetId);
+        if (targetId) {
+          this.showProfileModal(targetId);
+        } else { /* ... alerta ... */ }
+      });
+    } else { console.error("[Listeners] Static Error: btnVerPerfilCompleto not found"); }
+
     if (this.ui.loginForm) { this.ui.loginForm.addEventListener('submit', (e) => { e.preventDefault(); this.handleLogin(); }); } else { console.error("[Listeners] Static Error: loginForm not found."); }
     if (this.ui.btnLoginSubmit) { this.ui.btnLoginSubmit.addEventListener('click', () => this.handleLogin()); } else { console.error("[Listeners] Static Error: btnLoginSubmit not found."); }
     if (this.ui.btnEntrada) this.ui.btnEntrada.addEventListener('click', () => this.registrarPonto('check-in')); else console.error("[Listeners] Static Error: btnEntrada not found");
