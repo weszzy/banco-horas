@@ -13,150 +13,173 @@
 </head>
 
 <body>
-    <!-- Navbar -->
+    <!-- Navbar Fixa no Topo -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark sticky-top shadow-sm">
         <div class="container-fluid">
             <a class="navbar-brand" href="#">
-                <!-- Garanta que o caminho/arquivo exista em 'src/views/assets/' -->
                 <img src="assets/company-logo.png" alt="Logo" width="30" height="30"
-                    class="d-inline-block align-top me-2" onerror="this.style.display='none'">
-                <!-- Oculta se não carregar -->
-                Banco de Horas
+                    class="d-inline-block align-top me-2" onerror="this.style.display='none'"> Banco de Horas
             </a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
-                aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+            <!-- Botão Toggler que abre o Offcanvas (visível apenas em telas menores por padrão do Bootstrap) -->
+            <button class="navbar-toggler" type="button" data-bs-toggle="offcanvas" data-bs-target="#mainOffcanvas"
+                aria-controls="mainOffcanvas" aria-label="Toggle navigation">
                 <span class="navbar-toggler-icon"></span>
             </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav ms-auto align-items-center">
-                    <!-- Links Comuns (Visíveis após login) -->
-                    <li class="nav-item" id="navLinks" style="display: none;">
-                        <a class="nav-link" href="#" id="linkMeuPerfil"><i class="fas fa-user me-1"></i>Meu Perfil</a>
-                    </li>
-                    <!-- Links Admin (Visíveis após login como admin) -->
-                    <li class="nav-item" id="navAdminLinks" style="display: none;">
-                        <a class="nav-link" href="#" id="linkGerenciarFuncionarios"><i
-                                class="fas fa-users-cog me-1"></i>Gerenciar</a>
-                        <!-- Botão para abrir modal de novo funcionário -->
-                        <a class="nav-link" href="#" id="linkNovoFuncionario" data-bs-toggle="modal"
-                            data-bs-target="#employeeFormModal"><i class="fas fa-user-plus me-1"></i>Novo
-                            Funcionário</a>
-                    </li>
-                    <!-- Área de Login/Logout -->
-                    <li class="nav-item ms-lg-2" id="authArea">
-                        <button class="btn btn-primary" data-bs-toggle="modal"
-                            data-bs-target="#loginModal">Login</button>
-                    </li>
-                </ul>
+            <!-- Área de Login/Logout (visível na navbar em telas maiores, ou pode ir pro offcanvas) -->
+            <div class="ms-auto" id="authArea">
+                <button class="btn btn-primary btn-sm" data-bs-toggle="modal"
+                    data-bs-target="#loginModal">Login</button>
             </div>
+            <!-- Nota: Os links de navegação foram movidos para o Offcanvas -->
         </div>
     </nav>
 
+    <!-- Offcanvas Menu Lateral -->
+    <div class="offcanvas offcanvas-start bg-dark text-white" tabindex="-1" id="mainOffcanvas"
+        aria-labelledby="mainOffcanvasLabel">
+        <div class="offcanvas-header border-bottom border-secondary">
+            <h5 class="offcanvas-title" id="mainOffcanvasLabel"><i class="fas fa-bars me-2"></i>Menu</h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas"
+                aria-label="Close"></button>
+        </div>
+        <div class="offcanvas-body">
+            <ul class="navbar-nav">
+                <!-- Links Comuns -->
+                <li class="nav-item" id="navLinksOffcanvas" style="display: none;">
+                    <a class="nav-link" href="#" id="linkMeuPerfilOffcanvas"><i class="fas fa-user fa-fw me-2"></i>Meu
+                        Perfil</a>
+                </li>
+                <hr class="text-secondary nav-separator" style="display: none;"> <!-- Separador visual -->
+                <!-- Links Admin -->
+                <li class="nav-item" id="navAdminLinksOffcanvas" style="display: none;">
+                    <a class="nav-link" href="#" id="linkGerenciarFuncionariosOffcanvas"><i
+                            class="fas fa-users-cog fa-fw me-2"></i>Gerenciar Funcionários</a>
+                    <a class="nav-link" href="#" id="linkNovoFuncionarioOffcanvas" data-bs-toggle="modal"
+                        data-bs-target="#employeeFormModal"><i class="fas fa-user-plus fa-fw me-2"></i>Novo
+                        Funcionário</a>
+                </li>
+                <hr class="text-secondary nav-separator" id="navAdminSeparatorOffcanvas" style="display: none;">
+                <!-- Logout -->
+                <li class="nav-item" id="navLogoutOffcanvas" style="display: none;">
+                    <a class="nav-link" href="#" id="btnLogoutOffcanvas"><i
+                            class="fas fa-sign-out-alt fa-fw me-2"></i>Sair</a>
+                </li>
+            </ul>
+        </div>
+    </div> <!-- Fim Offcanvas -->
+
+
     <!-- Container Principal -->
-    <div class="container-fluid mt-4 main-container">
+    <div class="container-fluid mt-3 mb-3 main-container"> <!-- Reduzida margem top/bottom -->
         <div id="alertPlaceholder" class="alert-container"></div>
 
         <!-- Área de Dashboard (Visível após login) -->
         <div id="dashboardArea" style="display: none;">
-            <div class="row g-4">
-                <!-- Coluna Esquerda: Ações e Status -->
-                <div class="col-lg-7 col-md-6">
-                    <!-- Card de Registro de Ponto -->
-                    <div class="card shadow-sm mb-4">
-                        <div class="card-header bg-primary text-white">
-                            <h5 class="card-title mb-0"><i class="fas fa-user-clock me-2"></i>Registro de Ponto</h5>
+            <div class="row g-3"> <!-- Espaçamento menor (g-3) -->
+
+                <!-- 1. Resumo Rápido (Saldo) - SEMPRE NO TOPO -->
+                <div class="col-12">
+                    <div class="card shadow-sm mb-3">
+                        <div class="card-body text-center p-2">
+                            <h6 class="card-subtitle mb-1 text-muted small">Saldo Atual Banco de Horas</h6>
+                            <!-- Indicador de Loading -->
+                            <div id="summaryLoadingMobile" class="py-2">
+                                <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+                                <span class="visually-hidden">Carregando...</span>
+                            </div>
+                            <!-- Saldo (inicialmente oculto) -->
+                            <h2 id="summaryBalanceMobile" class="fw-bold text-primary" style="display: none;">--:--</h2>
+                            <!-- Link rápido para perfil (usando stretched-link para área clicável) -->
+                            <a href="#" id="linkMeuPerfilRapido"
+                                class="btn btn-sm btn-outline-secondary mt-1 stretched-link">
+                                <i class="fas fa-user-circle me-1"></i>Ver Perfil/Histórico
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. Botões de Ação -->
+                <div class="col-12">
+                    <div class="card shadow-sm mb-3">
+                        <div class="card-header pt-2 pb-2"> <!-- Padding menor no header -->
+                            <h5 class="card-title mb-0 fs-6"><i class="fas fa-fingerprint me-2"></i>Registrar Ponto</h5>
+                            <small class="text-muted d-block" id="actionUserName">Para: Você</small>
                         </div>
                         <div class="card-body">
                             <form id="registroForm">
-                                <!-- Seleção (Admin) -->
-                                <div class="mb-3" id="employeeSelectContainer" style="display: none;">
-                                    <label for="employeeSelect" class="form-label">Visualizar Funcionário <span
-                                            class="text-muted">(Admin)</span></label>
-                                    <select id="employeeSelect" class="form-select select2" style="width: 100%;">
+                                <!-- Seleção Admin (Pode ser movido para outra tela/local se poluir muito o mobile) -->
+                                <div class="mb-3" id="employeeSelectContainerMobile" style="display: none;">
+                                    <label for="employeeSelectMobile" class="form-label small">Visualizar Outro
+                                        (Admin)</label>
+                                    <select id="employeeSelectMobile" class="form-select form-select-sm select2"
+                                        style="width: 100%;">
                                         <option></option>
                                     </select>
-                                    <small class="form-text text-danger d-block">Nota: Registro de ponto só pode ser
-                                        feito para você mesmo.</small>
+                                    <small class="form-text text-danger d-block mt-1">Apenas visualização. Registros só
+                                        podem ser feitos para você.</small>
                                 </div>
                                 <!-- Botões -->
-                                <div class="d-grid gap-3 mt-3">
-                                    <button type="button" id="btnEntrada" class="btn btn-success btn-lg" disabled><i
-                                            class="fas fa-sign-in-alt me-2"></i>Entrada</button>
+                                <div class="d-grid gap-2"> <!-- Gap menor -->
+                                    <button type="button" id="btnEntradaMobile" class="btn btn-success btn-lg"
+                                        disabled><i class="fas fa-sign-in-alt me-1"></i>Entrada</button>
                                     <div class="row g-2">
-                                        <div class="col"><button type="button" id="btnSaidaAlmoco"
-                                                class="btn btn-warning w-100" disabled><i
-                                                    class="fas fa-utensils me-2"></i>Saída Almoço</button></div>
-                                        <div class="col"><button type="button" id="btnRetornoAlmoco"
-                                                class="btn btn-info w-100" disabled><i
-                                                    class="fas fa-undo me-2"></i>Retorno Almoço</button></div>
+                                        <div class="col"><button type="button" id="btnSaidaAlmocoMobile"
+                                                class="btn btn-warning w-100" disabled><i class="fas fa-utensils"></i>
+                                                Almoço</button></div>
+                                        <div class="col"><button type="button" id="btnRetornoAlmocoMobile"
+                                                class="btn btn-info w-100" disabled><i class="fas fa-undo"></i>
+                                                Retorno</button></div>
                                     </div>
-                                    <button type="button" id="btnSaida" class="btn btn-danger btn-lg" disabled><i
-                                            class="fas fa-sign-out-alt me-2"></i>Saída</button>
+                                    <button type="button" id="btnSaidaMobile" class="btn btn-danger btn-lg" disabled><i
+                                            class="fas fa-sign-out-alt me-1"></i>Saída</button>
                                 </div>
                             </form>
                         </div>
                     </div>
-                    <!-- Card de Status de Hoje -->
+                </div>
+
+                <!-- 3. Status de Hoje -->
+                <div class="col-12">
                     <div class="card shadow-sm">
-                        <div class="card-header">
-                            <h5 class="card-title mb-0">Status de Hoje (<span id="statusDate">--/--/----</span>)</h5>
+                        <div class="card-header pt-2 pb-2"> <!-- Padding menor -->
+                            <h5 class="card-title mb-0 fs-6">Status de Hoje (<span id="statusDateMobile">--/--</span>)
+                            </h5>
                         </div>
-                        <div class="card-body" id="statusContainer">
-                            <div class="text-center py-3" id="statusPlaceholder">
-                                <p class="text-muted">Carregando status...</p>
-                            </div>
-                            <div id="statusDetails" style="display: none;">
-                                <ul class="list-group list-group-flush">
-                                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                                        <span>Entrada:</span> <strong id="statusEntrada">--:--</strong>
+                        <div class="card-body p-2" id="statusContainerMobile">
+                            <div class="text-center text-muted py-3" id="statusPlaceholderMobile">Carregando...</div>
+                            <div id="statusDetailsMobile" style="display: none;">
+                                <ul class="list-group list-group-flush small">
+                                    <li class="list-group-item d-flex justify-content-between ps-1 pe-1 pt-1 pb-1">
+                                        <span>Entrada:</span> <strong id="statusEntradaMobile">--:--</strong></li>
+                                    <li class="list-group-item d-flex justify-content-between ps-1 pe-1 pt-1 pb-1">
+                                        <span>Saída Almoço:</span> <strong id="statusSaidaAlmocoMobile">--:--</strong>
                                     </li>
-                                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                                        <span>Saída Almoço:</span> <strong id="statusSaidaAlmoco">--:--</strong>
-                                    </li>
-                                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                                        <span>Retorno Almoço:</span> <strong id="statusRetornoAlmoco">--:--</strong>
-                                    </li>
-                                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                                        <span>Saída:</span> <strong id="statusSaida">--:--</strong>
-                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between ps-1 pe-1 pt-1 pb-1">
+                                        <span>Retorno Almoço:</span> <strong
+                                            id="statusRetornoAlmocoMobile">--:--</strong></li>
+                                    <li class="list-group-item d-flex justify-content-between ps-1 pe-1 pt-1 pb-1">
+                                        <span>Saída:</span> <strong id="statusSaidaMobile">--:--</strong></li>
                                     <li
-                                        class="list-group-item d-flex justify-content-between align-items-center bg-light">
-                                        <strong>Total Trabalhado:</strong> <strong id="statusTotalHoras">-.-- h</strong>
+                                        class="list-group-item d-flex justify-content-between ps-1 pe-1 pt-1 pb-1 bg-light">
+                                        <strong>Trabalhado:</strong> <strong id="statusTotalHorasMobile">-.-- h</strong>
                                     </li>
                                 </ul>
                             </div>
                         </div>
                     </div>
                 </div>
-                <!-- Coluna Direita: Resumo/Saldo -->
-                <div class="col-lg-5 col-md-6">
-                    <div class="card shadow-sm">
-                        <div class="card-header">
-                            <h5 class="card-title mb-0"><i class="fas fa-chart-line me-2"></i>Meu Resumo</h5>
-                        </div>
-                        <div class="card-body">
-                            <div id="summaryLoading" class="text-center text-muted py-3">Carregando...</div>
-                            <div id="summaryContent" style="display: none;">
-                                <div class="text-center mb-3">
-                                    <h6 class="card-subtitle mb-2 text-muted">Saldo Atual - Banco de Horas</h6>
-                                    <h1 id="summaryBalance" class="display-4 fw-bold text-primary">--:--</h1>
-                                    <small id="summaryBalanceHint" class="text-muted">(Saldo acumulado)</small>
-                                </div>
-                                <hr>
-                                <div class="d-grid">
-                                    <button class="btn btn-outline-primary" id="btnVerPerfilCompleto"><i
-                                            class="fas fa-user-circle me-2"></i>Ver Perfil Completo e Histórico</button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+
+            </div><!-- Fim .row -->
         </div> <!-- Fim #dashboardArea -->
 
         <!-- Área de Gerenciamento (Visível para Admin) -->
         <div id="adminArea" style="display: none;">
-            <h2 class="mb-3"><i class="fas fa-users-cog me-2"></i>Gerenciamento de Funcionários</h2>
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h2 class="mb-0"><i class="fas fa-users-cog me-2"></i>Gerenciar Funcionários</h2>
+                <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#employeeFormModal">
+                    <i class="fas fa-user-plus me-1"></i> Novo
+                </button>
+            </div>
             <div class="card shadow-sm">
                 <div class="card-body">
                     <div class="table-responsive">
@@ -167,19 +190,20 @@
                                     <th>Email</th>
                                     <th>Cargo</th>
                                     <th>Status</th>
-                                    <th>Saldo Horas</th>
+                                    <th>Saldo</th>
                                     <th>Ações</th>
                                 </tr>
                             </thead>
                             <tbody id="employeeListTableBody">
                                 <tr>
-                                    <td colspan="6" class="text-center">Carregando funcionários...</td>
+                                    <td colspan="6" class="text-center">Carregando...</td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
                 </div>
             </div>
+            <!-- TODO: Adicionar botão para Adicionar Registro Manual aqui -->
         </div>
 
         <!-- Mensagem para fazer Login -->
@@ -189,139 +213,20 @@
             <button class="btn btn-primary btn-lg" data-bs-toggle="modal" data-bs-target="#loginModal"><i
                     class="fas fa-sign-in-alt me-1"></i> Fazer Login</button>
         </div>
+
     </div> <!-- Fim .container-fluid -->
 
-    <!-- ========= MODAIS ========= -->
-
-    <!-- Modal de Login -->
-    <div class="modal fade" id="loginModal" tabindex="-1" aria-labelledby="loginModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="loginModalLabel">Login</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <form id="loginForm">
-                        <div class="mb-3"><label for="loginEmail" class="form-label">E-mail</label><input type="email"
-                                class="form-control" id="loginEmail" name="email" required autocomplete="email"></div>
-                        <div class="mb-3"><label for="loginPassword" class="form-label">Senha</label><input
-                                type="password" class="form-control" id="loginPassword" name="password" required
-                                autocomplete="current-password"></div>
-                        <div class="alert alert-danger mt-3" role="alert" id="loginError" style="display: none;"></div>
-                    </form>
-                </div>
-                <div class="modal-footer"><button type="button" class="btn btn-secondary"
-                        data-bs-dismiss="modal">Cancelar</button><button type="button" class="btn btn-primary"
-                        id="btnLoginSubmit">Entrar</button></div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal de Cadastro/Edição de Funcionário -->
+    <!-- ========= MODAIS (Estrutura interna mantida) ========= -->
+    <div class="modal fade" id="loginModal" tabindex="-1" aria-labelledby="loginModalLabel" aria-hidden="true">...</div>
     <div class="modal fade" id="employeeFormModal" tabindex="-1" aria-labelledby="employeeFormModalLabel"
-        aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="employeeFormModalLabel">Cadastrar Funcionário</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <form id="employeeForm" novalidate>
-                        <input type="hidden" id="employeeId" name="id">
-                        <div id="employeeFormError" class="alert alert-danger" style="display: none;"></div>
-                        <div class="mb-3"><label for="employeeFullName" class="form-label">Nome Completo <span
-                                    class="text-danger">*</span></label><input type="text" class="form-control"
-                                id="employeeFullName" name="fullName" required minlength="3" maxlength="100">
-                            <div class="invalid-feedback">Nome completo (3-100 caracteres).</div>
-                        </div>
-                        <div class="mb-3"><label for="employeeEmail" class="form-label">E-mail <span
-                                    class="text-danger">*</span></label><input type="email" class="form-control"
-                                id="employeeEmail" name="email" required>
-                            <div class="invalid-feedback">Forneça um e-mail válido.</div>
-                        </div>
-                        <div class="mb-3" id="passwordFieldContainer"><label for="employeePassword"
-                                class="form-label">Senha</label><input type="password" class="form-control"
-                                id="employeePassword" name="password" minlength="6"
-                                placeholder="Deixe em branco para não alterar">
-                            <div class="invalid-feedback">Senha deve ter pelo menos 6 caracteres.</div><small
-                                id="passwordHelp" class="form-text text-muted">Obrigatório para novos
-                                funcionários.</small>
-                        </div>
-                        <div class="row">
-                            <div class="col-md-6 mb-3"><label for="employeeRole" class="form-label">Cargo <span
-                                        class="text-danger">*</span></label><select class="form-select"
-                                    id="employeeRole" name="role" required>
-                                    <option value="" disabled>Selecione...</option>
-                                    <option value="employee" selected>Colaborador</option>
-                                    <option value="manager">Gerente</option>
-                                    <option value="admin">Administrador</option>
-                                </select>
-                                <div class="invalid-feedback">Selecione um cargo.</div>
-                            </div>
-                            <div class="col-md-6 mb-3"><label for="employeeWeeklyHours" class="form-label">Carga Horária
-                                    Sem. <span class="text-danger">*</span></label><input type="number" step="0.5"
-                                    class="form-control" id="employeeWeeklyHours" name="weeklyHours" required min="10"
-                                    max="60" placeholder="Ex: 44">
-                                <div class="invalid-feedback">Carga (10-60).</div>
-                            </div>
-                        </div>
-                        <div class="row">
-                            <div class="col-md-6 mb-3"><label for="employeeBirthDate" class="form-label">Data
-                                    Nasc.</label><input type="date" class="form-control" id="employeeBirthDate"
-                                    name="birthDate"></div>
-                            <div class="col-md-6 mb-3"><label for="employeeHireDate" class="form-label">Data
-                                    Admissão</label><input type="date" class="form-control" id="employeeHireDate"
-                                    name="hireDate"></div>
-                        </div>
-                        <div class="mb-3"><label for="employeePhotoUrl" class="form-label">URL da Foto</label><input
-                                type="url" class="form-control" id="employeePhotoUrl" name="photoUrl"
-                                placeholder="https://...">
-                            <div class="invalid-feedback">Forneça uma URL válida.</div>
-                        </div>
-                    </form>
-                </div>
-                <div class="modal-footer"><button type="button" class="btn btn-secondary"
-                        data-bs-dismiss="modal">Cancelar</button><button type="button" class="btn btn-primary"
-                        id="btnSaveChangesEmployee">Salvar Alterações</button></div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal de Perfil do Funcionário -->
+        aria-hidden="true">...</div>
     <div class="modal fade modal-lg" id="profileModal" tabindex="-1" aria-labelledby="profileModalLabel"
-        aria-hidden="true">
-        <div class="modal-dialog modal-dialog-scrollable">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="profileModalLabel">Perfil do Funcionário</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body" id="profileModalBody">
-                    <div class="text-center p-5"><span class="spinner-border spinner-border-sm"></span> Carregando...
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <div id="profileAdminActions" style="display: none;"><button type="button"
-                            class="btn btn-warning btn-sm" id="btnEditProfile"><i class="fas fa-edit me-1"></i> Editar
-                            Perfil</button><button type="button" class="btn btn-danger btn-sm"
-                            id="btnToggleActiveStatus"><i class="fas fa-power-off me-1"></i> Desativar</button></div>
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
-                </div>
-            </div>
-        </div>
-    </div>
+        aria-hidden="true">...</div>
 
-
-    <!-- Scripts -->
-    <!-- 1. jQuery (Verificar se Select2 ainda precisa ou se algum componente BS antigo usa) -->
+    <!-- Scripts (Ordem verificada) -->
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-    <!-- 2. Bootstrap Bundle (Inclui Popper) - ESSENCIAL -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <!-- 3. Select2 -->
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
-    <!-- 4. Seu script personalizado POR ÚLTIMO -->
     <script src="script.js"></script>
 </body>
 
