@@ -1,3 +1,10 @@
+// src/views/script.js
+/**
+ * Sistema de Controle de Ponto v1.3.6 (Baseado no original de ~768 linhas)
+ * Correções aplicadas APENAS para inicialização de modais e adição de listeners.
+ * Gerencia autenticação, registro de ponto, perfil e administração.
+ */
+
 class PontoApp {
   constructor() {
     // Apenas cacheia referências DOM aqui. Instâncias e estado vêm depois.
@@ -7,7 +14,7 @@ class PontoApp {
 
   // Separa o cache de elementos para melhor organização
   _cacheDOMElements() {
-    console.log("[CacheDOM v1.3.5] Caching DOM Elements...");
+    console.log("[CacheDOM v1.3.6] Caching DOM Elements...");
     this.ui = {
       // Modals (Guardar referência ao elemento DOM primeiro)
       loginModalElement: document.getElementById('loginModal'),
@@ -77,21 +84,21 @@ class PontoApp {
       btnEditProfile: document.getElementById('btnEditProfile'),
       btnToggleActiveStatus: document.getElementById('btnToggleActiveStatus')
     };
-    // Verifica se elementos essenciais foram encontrados (exceto modais e jQuery)
+    // Verifica se elementos essenciais foram encontrados
     for (const key in this.ui) {
       if (key === 'employeeSelect' || key.endsWith('Modal') || key.endsWith('Element')) continue;
       if (!this.ui[key]) {
         console.warn(`[CacheDOM] Elemento UI '${key}' não encontrado no HTML inicial.`);
       }
     }
-    console.log("[CacheDOM] DOM Elements cached (references stored).");
+    console.log("[CacheDOM] DOM Elements cached.");
   }
 
   // Inicializa instâncias de Modal e estado (CHAMADO APÓS VERIFICAÇÃO DO BOOTSTRAP)
   _initializeComponents() {
     console.log("[InitComp] Initializing components (Modals, State)...");
     const canInitModals = typeof bootstrap !== 'undefined' && bootstrap.Modal;
-    if (!canInitModals) { console.error("FATAL: Bootstrap Modal component not found. Modals will not work."); }
+    if (!canInitModals) { console.error("FATAL: Bootstrap Modal component not found."); }
     if (this.ui.loginModalElement && canInitModals) { this.ui.loginModal = new bootstrap.Modal(this.ui.loginModalElement); }
     else if (!this.ui.loginModalElement) { console.error("[InitComp] Login Modal element reference not found."); }
     else { console.error("[InitComp] Bootstrap Modal class not available for Login Modal."); }
@@ -110,7 +117,7 @@ class PontoApp {
 
   // Método chamado após a instância ser criada e o Bootstrap verificado
   _init() {
-    console.log("PontoApp v1.3.5 _init called...");
+    console.log("PontoApp v1.3.6 _init called...");
     this._initializeComponents(); // Inicializa estado e modais
     this._setupStaticEventListeners(); // Configura listeners estáticos
     this._initSelect2();
@@ -120,18 +127,6 @@ class PontoApp {
   // Listeners para elementos que SEMPRE existem no HTML inicial
   _setupStaticEventListeners() {
     console.log("[Listeners] Setting up static event listeners...");
-    if (this.ui.btnVerPerfilCompleto) {
-      this.ui.btnVerPerfilCompleto.addEventListener('click', () => {
-        // <<< LOG ADICIONADO AQUI >>>
-        console.log("[Listeners] Botão 'Ver Perfil Completo' (estático) CLICADO!");
-        const targetId = this.state.selectedEmployeeId || this.state.currentUser?.id;
-        console.log("[Listeners] Target ID para perfil:", targetId);
-        if (targetId) {
-          this.showProfileModal(targetId);
-        } else { /* ... alerta ... */ }
-      });
-    } else { console.error("[Listeners] Static Error: btnVerPerfilCompleto not found"); }
-
     if (this.ui.loginForm) { this.ui.loginForm.addEventListener('submit', (e) => { e.preventDefault(); this.handleLogin(); }); } else { console.error("[Listeners] Static Error: loginForm not found."); }
     if (this.ui.btnLoginSubmit) { this.ui.btnLoginSubmit.addEventListener('click', () => this.handleLogin()); } else { console.error("[Listeners] Static Error: btnLoginSubmit not found."); }
     if (this.ui.btnEntrada) this.ui.btnEntrada.addEventListener('click', () => this.registrarPonto('check-in')); else console.error("[Listeners] Static Error: btnEntrada not found");
@@ -139,7 +134,7 @@ class PontoApp {
     if (this.ui.btnRetornoAlmoco) this.ui.btnRetornoAlmoco.addEventListener('click', () => this.registrarPonto('lunch-end')); else console.error("[Listeners] Static Error: btnRetornoAlmoco not found");
     if (this.ui.btnSaida) this.ui.btnSaida.addEventListener('click', () => this.registrarPonto('check-out')); else console.error("[Listeners] Static Error: btnSaida not found");
     if (this.ui.employeeSelect && this.ui.employeeSelect.length > 0) { this.ui.employeeSelect.on('change', (e) => { const selectedValue = $(e.target).val(); this.state.selectedEmployeeId = selectedValue ? parseInt(selectedValue, 10) : this.state.currentUser?.id; this.handleEmployeeSelectionChange(); }); } else { console.error("[Listeners] Static Error: employeeSelect jQuery object not found or empty.") }
-    if (this.ui.btnVerPerfilCompleto) { this.ui.btnVerPerfilCompleto.addEventListener('click', () => { const targetId = this.state.selectedEmployeeId || this.state.currentUser?.id; console.log("[Listeners] Botão 'Ver Perfil Completo' clicado. Target ID:", targetId); if (targetId) { this.showProfileModal(targetId); } else { console.warn("[Listeners] Tentativa de ver perfil sem ID selecionado ou usuário logado."); this.showAlert('info', 'Selecione um funcionário ou faça login para ver o perfil.'); } }); } else { console.error("[Listeners] Static Error: btnVerPerfilCompleto not found"); }
+    if (this.ui.btnVerPerfilCompleto) { this.ui.btnVerPerfilCompleto.addEventListener('click', () => { const targetId = this.state.selectedEmployeeId || this.state.currentUser?.id; console.log("[Listeners] Botão 'Ver Perfil Completo' clicado. Target ID:", targetId); if (targetId) { this.showProfileModal(targetId); } else { console.warn("[Listeners] Tentativa de ver perfil sem ID."); this.showAlert('info', 'Selecione um funcionário ou faça login.'); } }); } else { console.error("[Listeners] Static Error: btnVerPerfilCompleto not found"); }
     if (this.ui.employeeForm) this.ui.employeeForm.addEventListener('submit', (e) => { e.preventDefault(); this.handleSaveEmployeeForm(); }); else console.error("[Listeners] Static Error: employeeForm not found.");
     if (this.ui.btnSaveChangesEmployee) this.ui.btnSaveChangesEmployee.addEventListener('click', () => this.handleSaveEmployeeForm()); else console.error("[Listeners] Static Error: btnSaveChangesEmployee not found.");
     if (this.ui.employeeFormModalElement) { this.ui.employeeFormModalElement.addEventListener('show.bs.modal', (e) => { console.log("[Listeners] Evento 'show.bs.modal' disparado para employeeFormModal"); const button = e.relatedTarget; const employeeId = button?.dataset.employeeId; this.prepareEmployeeForm(employeeId ? parseInt(employeeId, 10) : null); }); } else { console.error("[Listeners] Static Error: employeeFormModalElement not found."); }
@@ -165,8 +160,7 @@ class PontoApp {
     console.log("[Listeners] Dynamic event listeners for Navbar set up completed.");
   }
 
-
-  // ================ MÉTODOS RESTAURADOS E MANTIDOS ================
+  // ================ MÉTODOS RESTANTES (PRESERVADOS DO SEU ORIGINAL) ================
 
   _initSelect2() {
     if (this.ui.employeeSelect && this.ui.employeeSelect.length > 0 && typeof $.fn.select2 === 'function') {
@@ -336,33 +330,23 @@ class PontoApp {
   }
 
   renderProfileModalContent(employee, history) {
-
-    <td>
-      ${parseFloat(h.dailyBalance) > 0 ? '+' : ''}${h.dailyBalance}h
-      // ADICIONAR BOTÃO DE EXCLUSÃO (APENAS VISÍVEL PARA ADMIN)
-      <button class="btn btn-outline-danger btn-sm ms-2 delete-record-btn"
-        data-record-id="${h.id}" // ASSUMINDO que 'h' tenha o ID do registro
-        style="display: ${this.state.currentUser?.role === 'admin' ? 'inline-block' : 'none'};"
-        title="Remover este registro">
-        <i class="fas fa-trash-alt"></i>
-      </button>
-    </td>
-
     if (!this.ui.profileModalLabel || !this.ui.profileModalBody || !this.ui.profileAdminActions) { console.error("Elementos internos do Modal de Perfil não encontrados para renderizar."); return; }
-    this.ui.profileModalLabel.textContent = `Perfil de ${employee.fullName}`; let age = 'N/A'; if (employee.birthDate) { try { const birthDate = new Date(employee.birthDate); const today = new Date(); age = today.getFullYear() - birthDate.getFullYear(); const m = today.getMonth() - birthDate.getMonth(); if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) { age--; } } catch { age = 'Inválida'; } } const balance = parseFloat(employee.hourBalance || 0); const formattedBalance = balance.toLocaleString('pt-BR', { style: 'decimal', minimumFractionDigits: 2, maximumFractionDigits: 2 }); let balanceText = formattedBalance + "h"; let balanceClass = 'balance-zero'; if (balance > 0.01) { balanceText = "+" + balanceText; balanceClass = 'balance-positive'; } else if (balance < -0.01) { balanceClass = 'balance-negative'; } let historyHtml = '<p class="text-muted text-center">Nenhum registro finalizado nos últimos 7 dias.</p>'; if (history && history.length > 0) { historyHtml = `<table class="table table-sm table-striped" id="balanceHistoryTable"><thead><tr><th>Data</th><th>Trabalhado</th><th>Meta</th><th>Saldo Dia</th></tr></thead><tbody>${history.map(h => `<tr><td>${new Date(h.date).toLocaleDateString('pt-BR')}</td><td>${h.workedHours}h</td><td>${h.dailyGoal}h</td><td class="${parseFloat(h.dailyBalance) > 0.01 ? 'balance-positive' : (parseFloat(h.dailyBalance) < -0.01 ? 'balance-negative' : '')}">${parseFloat(h.dailyBalance) > 0 ? '+' : ''}${h.dailyBalance}h</td></tr>`).join('')}</tbody></table>`; }
+    this.ui.profileModalLabel.textContent = `Perfil de ${employee.fullName}`; let age = 'N/A'; if (employee.birthDate) { try { const birthDate = new Date(employee.birthDate); const today = new Date(); age = today.getFullYear() - birthDate.getFullYear(); const m = today.getMonth() - birthDate.getMonth(); if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) { age--; } } catch { age = 'Inválida'; } } const balance = parseFloat(employee.hourBalance || 0); const formattedBalance = balance.toLocaleString('pt-BR', { style: 'decimal', minimumFractionDigits: 2, maximumFractionDigits: 2 }); let balanceText = formattedBalance + "h"; let balanceClass = 'balance-zero'; if (balance > 0.01) { balanceText = "+" + balanceText; balanceClass = 'balance-positive'; } else if (balance < -0.01) { balanceClass = 'balance-negative'; } let historyHtml = '<p class="text-muted text-center">Nenhum registro finalizado nos últimos 7 dias.</p>'; if (history && history.length > 0) { historyHtml = `<table class="table table-sm table-striped" id="balanceHistoryTable"><thead><tr><th>Data</th><th>Trabalhado</th><th>Meta</th><th>Saldo Dia</th><th>Ações Admin</th></tr></thead><tbody>${history.map(h => `<tr><td>${new Date(h.date).toLocaleDateString('pt-BR')}</td><td>${h.workedHours}h</td><td>${h.dailyGoal}h</td><td class="${parseFloat(h.dailyBalance) > 0.01 ? 'balance-positive' : (parseFloat(h.dailyBalance) < -0.01 ? 'balance-negative' : '')}">${parseFloat(h.dailyBalance) > 0 ? '+' : ''}${h.dailyBalance}h</td><td><button class="btn btn-outline-danger btn-sm ms-2 delete-record-btn" data-record-id="${h.id /* PRECISA GARANTIR QUE O ID VENHA DA API */}" style="display: ${this.state.currentUser?.role === 'admin' ? 'inline-block' : 'none'};" title="Remover este registro"><i class="fas fa-trash-alt"></i></button></td></tr>`).join('')}</tbody></table>`; } // ADICIONADO O BOTÃO AQUI (COM VERIFICAÇÃO ADMIN) E COLUNA EXTRA
     this.ui.profileModalBody.innerHTML = `<div class="row mb-4"><div class="col-md-4 text-center"><img src="${employee.photoUrl || 'assets/default-avatar.png'}" alt="Foto de ${employee.fullName}" class="img-fluid profile-photo mb-2" onerror="this.onerror=null; this.src='assets/default-avatar.png';"><span class="badge bg-${employee.isActive ? 'success' : 'danger'}">${employee.isActive ? 'Ativo' : 'Inativo'}</span></div><div class="col-md-8"><h4>${employee.fullName}</h4><p class="text-muted mb-1">${employee.role}</p><p><i class="fas fa-envelope fa-fw me-2"></i>${employee.email}</p><p><i class="fas fa-birthday-cake fa-fw me-2"></i>${age} anos ${employee.birthDate ? '(' + new Date(employee.birthDate).toLocaleDateString('pt-BR') + ')' : ''}</p><p><i class="fas fa-calendar-alt fa-fw me-2"></i>Admissão: ${employee.hireDate ? new Date(employee.hireDate).toLocaleDateString('pt-BR') : 'N/A'}</p><p><i class="fas fa-briefcase fa-fw me-2"></i>Carga Semanal: ${employee.weeklyHours} horas</p><hr><p class="mb-1"><strong>Saldo Banco de Horas:</strong></p><h3 class="fw-bold ${balanceClass}">${balanceText}</h3></div></div><h5>Histórico Recente (Últimos 7 dias)</h5>${historyHtml}`;
     if (this.state.currentUser?.role === 'admin') { this.ui.profileAdminActions.style.display = 'block'; const btnToggle = this.ui.btnToggleActiveStatus; if (btnToggle) { if (employee.isActive) { btnToggle.innerHTML = '<i class="fas fa-power-off me-1"></i> Desativar'; btnToggle.classList.remove('btn-success'); btnToggle.classList.add('btn-danger'); } else { btnToggle.innerHTML = '<i class="fas fa-power-off me-1"></i> Ativar'; btnToggle.classList.remove('btn-danger'); btnToggle.classList.add('btn-success'); } } else { console.error("Botão Toggle Status não encontrado no modal de perfil"); } } else { if (this.ui.profileAdminActions) this.ui.profileAdminActions.style.display = 'none'; }
 
+    // Adiciona listeners aos botões de deletar APÓS renderizar a tabela
     this.ui.profileModalBody.querySelectorAll('.delete-record-btn').forEach(btn => {
-      btn.addEventListener('click', async (e) => {
+      // Remove listener antigo para evitar duplicação se re-renderizar
+      if (btn.onclick) { btn.onclick = null; }
+      btn.addEventListener('click', async (e) => { // Usa addEventListener para mais flexibilidade
         const recordId = e.currentTarget.dataset.recordId;
-        const employeeName = employee.fullName; // Pega nome para confirmação
-        if (confirm(`Tem certeza que deseja remover o registro #${recordId} de ${employeeName}? Esta ação não pode ser desfeita.`)) {
-          await this.handleDeleteRecord(recordId, employee.id); // Passa employeeId para recarregar perfil
+        const employeeName = employee.fullName;
+        if (confirm(`Tem certeza que deseja remover o registro #${recordId} de ${employeeName}?`)) {
+          await this.handleDeleteRecord(recordId, employee.id);
         }
       });
     });
-
   }
 
   editProfileFromModal() {
@@ -385,14 +369,16 @@ class PontoApp {
     } catch (error) { if (error.message !== 'Não autorizado') { console.error("Erro ao carregar lista admin:", error); this.ui.employeeListTableBody.innerHTML = `<tr><td colspan="6" class="text-center text-danger">Erro ao carregar funcionários: ${error.message}</td></tr>`; } }
   }
 
+  // Adicionado Método handleDeleteRecord
   async handleDeleteRecord(recordId, employeeIdToRefresh) {
     console.log(`[Admin] Deletando registro ID: ${recordId}`);
+    if (!this.state.currentUser || this.state.currentUser.role !== 'admin') {
+      this.showAlert('danger', 'Apenas administradores podem remover registros.');
+      return;
+    }
     try {
-      const response = await this.fetchWithAuth(`/api/time-records/${recordId}`, {
-        method: 'DELETE'
-      });
-      // Se fetchWithAuth tratar erro 401/403 e rejeitar, o catch abaixo pega
-      if (!response) return;
+      const response = await this.fetchWithAuth(`/api/time-records/${recordId}`, { method: 'DELETE' });
+      if (!response) return; // Erro tratado em fetchWithAuth
 
       const result = await response.json();
       if (!response.ok || !result.success) {
@@ -400,18 +386,20 @@ class PontoApp {
       }
       this.showAlert('success', 'Registro removido com sucesso!');
       // Recarrega o modal do perfil para mostrar o histórico atualizado
-      this.showProfileModal(employeeIdToRefresh);
-      // Se a visão admin estiver ativa, recarrega a lista também (pode afetar saldo)
+      if (this.ui.profileModalElement?.classList.contains('show')) { // Recarrega só se estiver aberto
+        this.showProfileModal(employeeIdToRefresh);
+      }
+      // Se a visão admin estiver ativa, recarrega a lista também
       if (this.state.currentView === 'admin') {
         this.loadAndDisplayAdminEmployeeList();
       }
-      // Atualiza o resumo do dashboard se estiver visível
-      if (this.state.currentView === 'dashboard') {
+      // Atualiza o resumo do dashboard se estiver visível e for o usuário atual
+      if (this.state.currentView === 'dashboard' && this.state.selectedEmployeeId === employeeIdToRefresh) {
         this.fetchAndUpdateSummary();
       }
 
     } catch (error) {
-      if (error.message !== 'Não autorizado') { // Evita alerta duplicado
+      if (error.message !== 'Não autorizado') {
         console.error(`Erro ao remover registro ${recordId}:`, error);
         this.showAlert('danger', `Falha ao remover registro: ${error.message}`);
       }
@@ -419,10 +407,11 @@ class PontoApp {
   }
 
 
-
   renderAdminEmployeeTable() {
     if (!this.ui.employeeListTableBody) return; if (this.state.employeeList.length === 0) { this.ui.employeeListTableBody.innerHTML = `<tr><td colspan="6" class="text-center text-muted">Nenhum funcionário cadastrado.</td></tr>`; return; }
     this.ui.employeeListTableBody.innerHTML = this.state.employeeList.map(emp => `<tr><td><a href="#" class="link-primary view-profile" data-employee-id="${emp.id}">${emp.fullName || 'Nome não definido'}</a></td><td>${emp.email || '-'}</td><td>${emp.role || '-'}</td><td><span class="badge bg-${emp.isActive ? 'success' : 'secondary'}">${emp.isActive ? 'Ativo' : 'Inativo'}</span></td><td>${parseFloat(emp.hourBalance || 0).toLocaleString('pt-BR', { style: 'decimal', minimumFractionDigits: 2, maximumFractionDigits: 2 })}h</td><td><div class="btn-group btn-group-sm" role="group"><button type="button" class="btn btn-outline-secondary view-profile" title="Ver Perfil" data-employee-id="${emp.id}"><i class="fas fa-eye"></i></button><button type="button" class="btn btn-outline-primary edit-employee" title="Editar" data-bs-toggle="modal" data-bs-target="#employeeFormModal" data-employee-id="${emp.id}"><i class="fas fa-edit"></i></button><button type="button" class="btn ${emp.isActive ? 'btn-outline-danger' : 'btn-outline-success'} toggle-status" title="${emp.isActive ? 'Desativar' : 'Ativar'}" data-employee-id="${emp.id}" data-current-status="${emp.isActive}"><i class="fas fa-power-off"></i></button></div></td></tr>`).join('');
+    // Adiciona listeners dinamicamente APÓS renderizar a tabela
+    console.log("[AdminTable] Attaching listeners to admin table buttons...");
     this.ui.employeeListTableBody.querySelectorAll('.view-profile').forEach(btn => { btn.addEventListener('click', (e) => { e.preventDefault(); this.showProfileModal(parseInt(e.currentTarget.dataset.employeeId, 10)); }); });
     this.ui.employeeListTableBody.querySelectorAll('.toggle-status').forEach(btn => { btn.addEventListener('click', async (e) => { const button = e.currentTarget; const employeeId = parseInt(button.dataset.employeeId, 10); const currentStatus = button.dataset.currentStatus === 'true'; const newStatus = !currentStatus; const actionText = newStatus ? 'ativar' : 'desativar'; if (!confirm(`Tem certeza que deseja ${actionText} ${this.state.employeeList.find(em => em.id === employeeId)?.fullName || 'este funcionário'}?`)) return; try { const response = await this.fetchWithAuth(`/api/employees/${employeeId}/status`, { method: 'PATCH', body: JSON.stringify({ isActive: newStatus }) }); if (!response) return; const result = await response.json(); if (!response.ok || !result.success) throw new Error(result.message || `Erro ${response.status}`); this.showAlert('success', `Funcionário ${actionText}do.`); this.loadAndDisplayAdminEmployeeList(); } catch (error) { if (error.message !== 'Não autorizado') this.showAlert('danger', `Erro ao ${actionText}: ${error.message}`); } }); });
   }
@@ -431,15 +420,17 @@ class PontoApp {
     if (!this.ui.employeeForm || !this.ui.employeeFormModalLabel || !this.ui.btnSaveChangesEmployee || !this.ui.passwordFieldContainer || !this.ui.employeePassword || !this.ui.passwordHelp || !this.ui.employeeEmail || !this.ui.employeeFormError) { console.error("Elementos do formulário de funcionário não encontrados para preparar."); return; }
     this.ui.employeeForm.reset(); this.ui.employeeForm.classList.remove('was-validated'); this.ui.employeeFormError.style.display = 'none'; this.ui.employeeId.value = employeeId || '';
     if (employeeId) {
-      this.ui.employeeFormModalLabel.textContent = "Editar Funcionário"; this.ui.btnSaveChangesEmployee.textContent = "Salvar Alterações"; this.ui.passwordFieldContainer.style.display = 'block'; this.ui.employeePassword.required = false; this.ui.passwordHelp.textContent = 'Deixe em branco para não alterar a senha.'; this.ui.employeeEmail.disabled = true; const employee = this.state.employeeList.find(emp => emp.id === employeeId); if (employee) { this.ui.employeeFullName.value = employee.fullName || ''; this.ui.employeeEmail.value = employee.email || ''; this.ui.employeeRole.value = employee.role || 'employee'; this.ui.employeeWeeklyHours.value = employee.weeklyHours || ''; this.ui.employeeBirthDate.value = employee.birthDate || ''; this.ui.employeeHireDate.value = employee.hireDate || ''; this.ui.employeePhotoUrl.value = employee.photoUrl || ''; } else { console.error("Funcionário para edição não encontrado no cache local."); this.ui.employeeFormError.textContent = 'Erro: Funcionário não encontrado para edição.'; this.ui.employeeFormError.style.display = 'block'; }
+      this.ui.employeeFormModalLabel.textContent = "Editar Funcionário"; this.ui.btnSaveChangesEmployee.textContent = "Salvar Alterações"; this.ui.passwordFieldContainer.style.display = 'block'; this.ui.employeePassword.required = false; this.ui.passwordHelp.textContent = 'Deixe em branco para não alterar a senha.'; this.ui.employeeEmail.disabled = true; const employee = this.state.employeeList.find(emp => emp.id === employeeId); if (employee) { this.ui.employeeFullName.value = employee.fullName || ''; this.ui.employeeEmail.value = employee.email || ''; this.ui.employeeRole.value = employee.role || 'employee'; this.ui.employeeWeeklyHours.value = employee.weeklyHours || ''; this.ui.employeeBirthDate.value = this.formatDateISO(employee.birthDate); this.ui.employeeHireDate.value = this.formatDateISO(employee.hireDate); this.ui.employeePhotoUrl.value = employee.photoUrl || ''; } else { console.error("Funcionário para edição não encontrado no cache local."); this.ui.employeeFormError.textContent = 'Erro: Funcionário não encontrado para edição.'; this.ui.employeeFormError.style.display = 'block'; }
     } else { this.ui.employeeFormModalLabel.textContent = "Cadastrar Novo Funcionário"; this.ui.btnSaveChangesEmployee.textContent = "Cadastrar Funcionário"; this.ui.passwordFieldContainer.style.display = 'block'; this.ui.employeePassword.required = true; this.ui.passwordHelp.textContent = 'Obrigatório para novos funcionários (mínimo 6 caracteres).'; this.ui.employeeEmail.disabled = false; }
   }
 
   async handleSaveEmployeeForm() {
     if (!this._validateEmployeeForm()) { if (this.ui.employeeFormError) { this.ui.employeeFormError.textContent = 'Por favor, corrija os campos inválidos.'; this.ui.employeeFormError.style.display = 'block'; } return; }
-    if (this.ui.employeeFormError) this.ui.employeeFormError.style.display = 'none'; const employeeId = this.ui.employeeId.value; const isEditing = !!employeeId; const formData = new FormData(this.ui.employeeForm); const data = Object.fromEntries(formData.entries()); if (isEditing && !data.password) { delete data.password; } if (!data.birthDate) delete data.birthDate; if (!data.hireDate) delete data.hireDate; if (!data.photoUrl) delete data.photoUrl; const url = isEditing ? `/api/employees/${employeeId}` : '/api/employees'; const method = isEditing ? 'PUT' : 'POST'; console.log(`Salvando funcionário (${method}):`, data); if (!this.ui.btnSaveChangesEmployee) { console.error("Botão Salvar não encontrado."); return; } this.ui.btnSaveChangesEmployee.disabled = true; this.ui.btnSaveChangesEmployee.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Salvando...';
+    if (this.ui.employeeFormError) this.ui.employeeFormError.style.display = 'none'; const employeeId = this.ui.employeeId.value; const isEditing = !!employeeId; const formData = new FormData(this.ui.employeeForm); const data = Object.fromEntries(formData.entries()); if (isEditing && !data.password) { delete data.password; } if (!data.birthDate) { delete data.birthDate; } else { data.birthDate = this.formatDateISO(new Date(data.birthDate + 'T00:00:00')); } // Garante formato YYYY-MM-DD
+    if (!data.hireDate) { delete data.hireDate; } else { data.hireDate = this.formatDateISO(new Date(data.hireDate + 'T00:00:00')); } // Garante formato YYYY-MM-DD
+    if (!data.photoUrl) delete data.photoUrl; const url = isEditing ? `/api/employees/${employeeId}` : '/api/employees'; const method = isEditing ? 'PUT' : 'POST'; console.log(`Salvando funcionário (${method}):`, data); if (!this.ui.btnSaveChangesEmployee) { console.error("Botão Salvar não encontrado."); return; } this.ui.btnSaveChangesEmployee.disabled = true; this.ui.btnSaveChangesEmployee.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Salvando...';
     try {
-      if (isEditing) delete data.email; delete data.id; const response = await this.fetchWithAuth(url, { method: method, body: JSON.stringify(data) }); if (!response) return; const result = await response.json(); if (!response.ok || !result.success) { const fieldError = result.error?.field ? ` (Campo: ${result.error.field})` : ''; throw new Error((result.message || `Erro ${response.status}`) + fieldError); } this.showAlert('success', `Funcionário ${isEditing ? 'atualizado' : 'cadastrado'} com sucesso!`); if (this.ui.employeeFormModal) this.ui.employeeFormModal.hide(); else console.warn("employeeFormModal instance not available to hide."); this.loadAndDisplayAdminEmployeeList();
+      if (isEditing) delete data.email; delete data.id; const response = await this.fetchWithAuth(url, { method: method, body: JSON.stringify(data) }); if (!response) return; const result = await response.json(); if (!response.ok || !result.success) { const fieldError = result.error?.field ? ` (Campo: ${result.error.field})` : ''; throw new Error((result.message || `Erro ${response.status}`) + fieldError); } this.showAlert('success', `Funcionário ${isEditing ? 'atualizado' : 'cadastrado'} com sucesso!`); if (this.ui.employeeFormModal) this.ui.employeeFormModal.hide(); else console.warn("employeeFormModal instance not available to hide."); if (this.state.currentView === 'admin') { this.loadAndDisplayAdminEmployeeList(); } // Recarrega a lista admin se estiver nela
     } catch (error) {
       if (error.message !== 'Não autorizado') { console.error("Erro ao salvar funcionário:", error); if (this.ui.employeeFormError) { this.ui.employeeFormError.textContent = `Erro: ${error.message}`; this.ui.employeeFormError.style.display = 'block'; } }
     } finally { if (this.ui.btnSaveChangesEmployee) { this.ui.btnSaveChangesEmployee.disabled = false; this.ui.btnSaveChangesEmployee.innerHTML = isEditing ? 'Salvar Alterações' : 'Cadastrar Funcionário'; } }
@@ -465,7 +456,20 @@ class PontoApp {
     const nomes = { 'check-in': 'Entrada', 'lunch-start': 'Saída Almoço', 'lunch-end': 'Retorno Almoço', 'check-out': 'Saída' }; return nomes[tipo] || tipo;
   }
   formatDateISO(date) {
-    if (!date) return ''; try { return date.toISOString().split('T')[0]; } catch { return ''; }
+    if (!date) return ''; try {
+      // Se já for string no formato YYYY-MM-DD, retorna
+      if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        return date;
+      }
+      // Se for objeto Date, formata
+      if (date instanceof Date) {
+        return date.toISOString().split('T')[0];
+      }
+      // Tenta converter se for string em outro formato (pode falhar)
+      const d = new Date(date);
+      if (isNaN(d.getTime())) return ''; // Retorna vazio se inválido
+      return d.toISOString().split('T')[0];
+    } catch { return ''; }
   }
 }
 
