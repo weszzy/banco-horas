@@ -1,6 +1,7 @@
+// src/services/balance.service.js
 const { TimeRecord } = require('../models/time-record.model');
 const { Employee } = require('../models/employee.model');
-const { Op, Sequelize } = require('sequelize');
+const { Op, Sequelize } = require('sequelize'); // Importar Sequelize para funções/agregação
 const logger = require('../utils/logger.util');
 
 class BalanceService {
@@ -9,264 +10,205 @@ class BalanceService {
      * Calcula a meta de horas diárias para um funcionário.
      * Assume uma semana de 5 dias úteis por padrão.
      * @param {number} weeklyHours - Carga horária semanal do funcionário.
-     * @returns {number} Meta de horas diárias.
+     * @returns {number} Meta de horas diárias, arredondada para 2 casas decimais.
      */
     _calculateDailyGoal(weeklyHours) {
-        // TODO: Considerar uma configuração mais flexível (ex: 6 dias/semana?)
-        const workDaysPerWeek = 5;
+        const workDaysPerWeek = 5; // TODO: Tornar configurável?
         if (!weeklyHours || weeklyHours <= 0 || workDaysPerWeek <= 0) {
-            return 0; // Evita divisão por zero ou metas inválidas
+            return 0;
         }
-        return weeklyHours / workDaysPerWeek;
+        // Arredonda para evitar problemas de ponto flutuante nos cálculos de saldo
+        return parseFloat((weeklyHours / workDaysPerWeek).toFixed(2));
     }
 
     /**
      * Calcula o saldo de horas para um único registro de ponto finalizado.
-     * @param {object} timeRecord - Instância do modelo TimeRecord.
-     * @param {object} employee - Instância do modelo Employee correspondente.
-     * @returns {number|null} Saldo de horas do dia (positivo ou negativo) ou null se inválido.
+     * Utilizado principalmente para cálculo de histórico ou antes de deletar.
+     * @param {object} timeRecord - Instância do modelo TimeRecord (DEVE ter totalHours).
+     * @param {object} employee - Instância do modelo Employee correspondente (DEVE ter weeklyHours).
+     * @returns {number|null} Saldo de horas (positivo/negativo) ou null se inválido/impossível calcular.
      */
     calculateDailyBalance(timeRecord, employee) {
         if (!timeRecord || !employee || !timeRecord.totalHours || !employee.weeklyHours) {
-            logger.warn(`Não foi possível calcular saldo diário. Dados incompletos para Record ID: ${timeRecord?.id}, Employee ID: ${employee?.id}`);
-            return null; // Não pode calcular sem os dados necessários
+            logger.warn(`[BalanceService] Não foi possível calcular saldo diário (calculateDailyBalance). Dados incompletos para Record ID: ${timeRecord?.id}, Employee ID: ${employee?.id}`);
+            return null;
         }
+        try {
+            const dailyGoal = this._calculateDailyGoal(parseFloat(employee.weeklyHours));
+            const workedHours = parseFloat(timeRecord.totalHours);
 
-        const dailyGoal = this._calculateDailyGoal(parseFloat(employee.weeklyHours));
-        const workedHours = parseFloat(timeRecord.totalHours);
+            // Verifica se os números são válidos após parse
+            if (isNaN(dailyGoal) || isNaN(workedHours)) {
+                logger.warn(`[BalanceService] Erro ao calcular saldo diário (calculateDailyBalance): Meta ou horas trabalhadas inválidas para Record ID: ${timeRecord.id}`);
+                return null;
+            }
 
-        if (isNaN(dailyGoal) || isNaN(workedHours)) {
-            logger.warn(`Erro ao calcular saldo diário: Meta ou horas trabalhadas inválidas para Record ID: ${timeRecord.id}`);
+            const dailyBalance = workedHours - dailyGoal;
+            // Retorna o saldo arredondado para 2 casas decimais
+            return parseFloat(dailyBalance.toFixed(2));
+        } catch (error) {
+            logger.error(`[BalanceService] Exceção em calculateDailyBalance para Record ID: ${timeRecord.id}`, error);
             return null;
         }
 
-        const dailyBalance = workedHours - dailyGoal;
-        return dailyBalance; // Pode ser positivo ou negativo
     }
 
     /**
-        * Recalcula o saldo de horas trabalhadas versus meta para um funcionário
-        * em um dia específico e atualiza o saldo acumulado (hour_balance).
-        *
-        * @param {number} employeeId - ID do funcionário.
-        * @param {Date | string} dateOrDateString - A data (objeto Date ou string 'YYYY-MM-DD') para recalcular.
-        * @param {Sequelize.Transaction} [transaction] - Transação opcional do Sequelize.
-        * @returns {Promise<boolean>} True se o saldo foi recalculado (mesmo que não tenha mudado), false se erro ou funcionário inativo.
-        */
-    async recalculateAndUpdateBalanceForDate(employeeId, dateOrDateString, transaction = null) {
-        const operationDate = new Date(dateOrDateString); // Converte string para Date se necessário
+     * Calcula o saldo de horas (trabalhadas vs meta) para um funcionário
+     * em um dia específico, baseado em TODOS os registros finalizados daquele dia.
+     *
+     * @param {number} employeeId - ID do funcionário.
+     * @param {Date | string} dateOrDateString - A data (objeto Date ou string 'YYYY-MM-DD').
+     * @param {Sequelize.Transaction} [transaction] - Transação opcional.
+     * @returns {Promise<number>} O saldo de horas TOTAL do dia (pode ser 0 se não houver registros ou erro).
+     */
+    async calculateDailyBalanceForDate(employeeId, dateOrDateString, transaction = null) {
+        const operationDate = new Date(dateOrDateString);
         if (isNaN(operationDate.getTime())) {
-            logger.error(`[BalanceService] Data inválida fornecida para recálculo: ${dateOrDateString}`);
-            return false;
+            logger.error(`[BalanceService] Data inválida fornecida para cálculo de saldo diário: ${dateOrDateString}`);
+            return 0;
         }
 
-        // Garante que estamos pegando o dia inteiro no fuso horário do servidor/DB
-        const dayStart = new Date(operationDate);
-        dayStart.setHours(0, 0, 0, 0);
-        const dayEnd = new Date(dayStart);
-        dayEnd.setDate(dayStart.getDate() + 1);
+        const dayStart = new Date(operationDate); dayStart.setHours(0, 0, 0, 0);
+        const dayEnd = new Date(dayStart); dayEnd.setDate(dayStart.getDate() + 1);
 
-        logger.info(`[BalanceService] Recalculando saldo para Employee ${employeeId} na data ${dayStart.toISOString().split('T')[0]}...`);
+        logger.info(`[BalanceService] Calculando saldo para o dia ${dayStart.toISOString().split('T')[0]} (Employee ${employeeId})...`);
 
         try {
-            const employee = await Employee.findByPk(employeeId, { transaction }); // Usa transação se fornecida
-            if (!employee) {
-                logger.error(`[BalanceService] Funcionário ${employeeId} não encontrado para recálculo.`);
-                return false;
-            }
-            if (!employee.isActive) {
-                logger.info(`[BalanceService] Funcionário ${employeeId} inativo. Recálculo pulado.`);
-                return true; // Considera sucesso, pois não há o que fazer
+            // Busca funcionário APENAS para obter weeklyHours
+            const employee = await Employee.findByPk(employeeId, { attributes: ['weeklyHours'], transaction });
+            if (!employee || !employee.weeklyHours) {
+                logger.warn(`[BalanceService] Funcionário ${employeeId} ou sua carga horária não encontrados para cálculo do dia.`);
+                return 0; // Não pode calcular sem a meta
             }
 
-            // Calcula o saldo ANTERIOR para este dia (se já existia)
-            // Isso é importante para aplicar apenas a DIFERENÇA no saldo acumulado
-            // Vamos simplificar por agora e recalcular o saldo acumulado desde o início do dia
-            // TODO: Implementar lógica de saldo delta para maior precisão com edições múltiplas
+            const dailyGoal = this._calculateDailyGoal(parseFloat(employee.weeklyHours));
 
-            // --- Recálculo do Saldo do Dia ---
-            // Busca todos os registros FINALIZADOS para o dia
-            const records = await TimeRecord.findAll({
+            // Busca e SOMA as horas trabalhadas de todos registros finalizados do dia
+            const result = await TimeRecord.findOne({
+                attributes: [
+                    [Sequelize.fn('SUM', Sequelize.col('total_hours')), 'totalWorkedDay']
+                ],
                 where: {
                     employeeId: employeeId,
                     startTime: { [Op.gte]: dayStart, [Op.lt]: dayEnd },
-                    endTime: { [Op.ne]: null } // Apenas registros com check-out
+                    endTime: { [Op.ne]: null } // Apenas finalizados
                 },
-                transaction // Usa transação
-            });
-
-            let totalWorkedHoursToday = 0;
-            if (records.length > 0) {
-                // Soma as horas totais de todos os registros do dia
-                // parseFloat é crucial pois totalHours é DECIMAL
-                totalWorkedHoursToday = records.reduce((sum, record) => sum + (record.totalHours ? parseFloat(record.totalHours) : 0), 0);
-            }
-            logger.info(`[BalanceService] Total trabalhado em ${dayStart.toISOString().split('T')[0]} por Employee ${employeeId}: ${totalWorkedHoursToday.toFixed(2)}h`);
-
-
-            // Calcula a meta diária
-            const dailyGoal = this._calculateDailyGoal(parseFloat(employee.weeklyHours));
-            logger.info(`[BalanceService] Meta diária para Employee ${employeeId}: ${dailyGoal.toFixed(2)}h`);
-
-            // Calcula o saldo APENAS para este dia
-            const currentDailyBalance = totalWorkedHoursToday - dailyGoal;
-            logger.info(`[BalanceService] Saldo calculado para o dia ${dayStart.toISOString().split('T')[0]}: ${currentDailyBalance.toFixed(2)}h`);
-
-
-            // --- ATUALIZAÇÃO DO SALDO ACUMULADO ---
-            // Esta é uma simplificação. Uma abordagem robusta recalcularia TUDO ou usaria deltas.
-            // Vamos recalcular o saldo TOTAL acumulado varrendo todos os registros finalizados até o fim do dia.
-            const allFinishedRecords = await TimeRecord.findAll({
-                where: {
-                    employeeId: employeeId,
-                    endTime: {
-                        [Op.ne]: null, // Finalizados
-                        [Op.lt]: dayEnd  // Até o fim do dia recalculado
-                    }
-                },
-                order: [['startTime', 'ASC']], // Importante processar em ordem
+                group: ['employeeId'], // Obrigatório para agregação SUM
+                plain: true,
                 transaction
             });
 
-            let newAccumulatedBalance = 0;
-            for (const record of allFinishedRecords) {
-                const dailyBal = this.calculateDailyBalance(record, employee);
-                if (dailyBal !== null) {
-                    newAccumulatedBalance += dailyBal;
-                }
+            const totalWorkedHoursToday = result && result.getDataValue('totalWorkedDay') ? parseFloat(result.getDataValue('totalWorkedDay')) : 0;
+
+            const dailyBalance = totalWorkedHoursToday - dailyGoal;
+            const roundedDailyBalance = parseFloat(dailyBalance.toFixed(2)); // Arredonda
+
+            logger.info(`[BalanceService] Saldo calculado para o dia ${dayStart.toISOString().split('T')[0]} (Employee ${employeeId}): Worked=${totalWorkedHoursToday.toFixed(2)}h, Goal=${dailyGoal.toFixed(2)}h, Balance=${roundedDailyBalance.toFixed(2)}h`);
+
+            return roundedDailyBalance; // Retorna o saldo *apenas* para este dia
+
+        } catch (error) {
+            logger.error(`[BalanceService] Erro ao calcular saldo diário para Employee ${employeeId} na data ${operationDate.toISOString()}:`, error);
+            return 0; // Retorna 0 em caso de erro
+        }
+    }
+
+    /**
+     * Atualiza o saldo acumulado ('hourBalance') de um funcionário,
+     * adicionando ou subtraindo um valor delta atomicamente.
+     * @param {number} employeeId - ID do funcionário.
+     * @param {number} balanceDelta - Valor a ser adicionado (positivo) ou subtraído (negativo).
+     * @param {Sequelize.Transaction} [transaction] - Transação opcional.
+     * @returns {Promise<boolean>} True se sucesso, false se erro ou funcionário não encontrado/inativo.
+     */
+    async updateAccumulatedBalance(employeeId, balanceDelta, transaction = null) {
+        if (typeof balanceDelta !== 'number' || isNaN(balanceDelta)) {
+            logger.error(`[BalanceService] Tentativa de atualizar saldo com delta inválido (${balanceDelta}) para Employee ${employeeId}.`);
+            return false;
+        }
+        const roundedDelta = parseFloat(balanceDelta.toFixed(2)); // Arredonda delta
+
+        // Se o delta for zero, não precisa fazer nada no banco
+        if (roundedDelta === 0) {
+            logger.info(`[BalanceService] Delta de saldo é zero para Employee ${employeeId}. Nenhuma atualização necessária.`);
+            return true;
+        }
+
+        logger.info(`[BalanceService] Tentando ATUALIZAR saldo acumulado para Employee ${employeeId} por ${roundedDelta.toFixed(2)}h.`);
+
+        try {
+            // Busca o funcionário para garantir que existe e está ativo, e para usar o método increment
+            const employee = await Employee.findByPk(employeeId, { attributes: ['id', 'isActive'], transaction });
+            if (!employee) {
+                logger.error(`[BalanceService] Funcionário ${employeeId} não encontrado para atualização de saldo.`);
+                return false;
+            }
+            if (!employee.isActive) {
+                logger.info(`[BalanceService] Funcionário ${employeeId} inativo. Saldo acumulado não atualizado.`);
+                return true; // Não é um erro, mas não atualiza
             }
 
-            // Atualiza o saldo no funcionário
-            // Usamos update direto para garantir atomicidade se não estivermos em uma transação maior
-            await Employee.update(
-                { hourBalance: newAccumulatedBalance.toFixed(2) }, // Garante 2 casas decimais
+            // Usa o método increment do Sequelize que é atômico (faz UPDATE ... SET hourBalance = hourBalance + delta)
+            const [results] = await Employee.increment( // increment retorna [affectedRows, metadata] ou [instance, created] dependendo do dialeto/versão
+                { hourBalance: roundedDelta },
                 { where: { id: employeeId }, transaction }
             );
 
-            logger.info(`[BalanceService] Saldo acumulado RECALCULADO e atualizado para Employee ${employeeId}: ${newAccumulatedBalance.toFixed(2)}h`);
+            // Verifica se alguma linha foi realmente afetada (pode não ser necessário com findByPk antes)
+            if (results === 0) {
+                logger.warn(`[BalanceService] Comando increment para Employee ${employeeId} não afetou nenhuma linha.`);
+                // Isso pode indicar um problema, mas a operação em si não falhou
+                // return false; // Ou retorna true? Depende se consideramos isso um erro. Vamos considerar sucesso por enquanto.
+            }
 
-            return true; // Indica que o recálculo foi tentado
+
+            logger.info(`[BalanceService] Saldo acumulado de Employee ${employeeId} atualizado com delta ${roundedDelta.toFixed(2)}h.`);
+            return true; // Sucesso na operação
 
         } catch (error) {
-            logger.error(`[BalanceService] Erro GERAL ao recalcular saldo para Employee ${employeeId} na data ${operationDate.toISOString()}:`, error);
-            // Se estivermos em uma transação, ela pode ser revertida no nível superior
-            return false; // Indica falha
+            logger.error(`[BalanceService] Erro ao ATUALIZAR saldo acumulado para Employee ${employeeId}:`, error);
+            return false; // Falha
         }
     }
 
-
     /**
-     * Atualiza o saldo acumulado de banco de horas para um funcionário
-     * com base nos registros de um dia específico.
-     * @param {number} employeeId - ID do funcionário.
-     * @param {Date} date - A data para a qual calcular e atualizar o saldo.
-     * @returns {Promise<number|null>} O novo saldo acumulado ou null se erro/nenhum registro.
+     * Calcula e retorna o histórico de saldo para exibição.
+     * @param {number} employeeId
+     * @param {Date} startDate
+     * @param {Date} endDate
+     * @returns {Promise<Array<object>>} Array com { id, date, workedHours, dailyGoal, dailyBalance, notes? }
      */
-    async updateEmployeeBalanceForDate(employeeId, date) {
-        try {
-            const employee = await Employee.findByPk(employeeId);
-            if (!employee) {
-                logger.error(`[BalanceService] Funcionário não encontrado: ${employeeId}`);
-                return null;
-            }
-            if (!employee.isActive) {
-                logger.info(`[BalanceService] Funcionário ${employeeId} está inativo. Saldo não atualizado.`);
-                return employee.hourBalance; // Retorna saldo atual sem modificar
-            }
-
-
-            // Define o início e fim do dia
-            const dayStart = new Date(date);
-            dayStart.setHours(0, 0, 0, 0);
-            const dayEnd = new Date(dayStart);
-            dayEnd.setDate(dayStart.getDate() + 1);
-
-            // Busca todos os registros FINALIZADOS (com endTime) para o funcionário naquele dia
-            const records = await TimeRecord.findAll({
-                where: {
-                    employeeId: employeeId,
-                    startTime: { // Idealmente, buscar por dia completo
-                        [Op.gte]: dayStart,
-                        [Op.lt]: dayEnd
-                    },
-                    endTime: { // Apenas registros com check-out
-                        [Op.ne]: null
-                    }
-                }
-            });
-
-            if (records.length === 0) {
-                logger.info(`[BalanceService] Nenhum registro finalizado encontrado para Employee ${employeeId} em ${date.toISOString().split('T')[0]}.`);
-                // TODO: Considerar se um dia sem registro deve gerar saldo negativo (falta)
-                // Por enquanto, não altera o saldo se não houver registro.
-                return employee.hourBalance;
-            }
-
-            // Calcula o saldo total do dia somando os saldos de cada registro
-            // (Normalmente haverá apenas um registro por dia, mas isso cobre casos múltiplos)
-            let totalDailyBalance = 0;
-            for (const record of records) {
-                const dailyBalance = this.calculateDailyBalance(record, employee);
-                if (dailyBalance !== null) {
-                    totalDailyBalance += dailyBalance;
-                }
-            }
-
-            // Atualiza o saldo acumulado do funcionário
-            // Usar increment para evitar race conditions se rodar concorrentemente (improvável aqui)
-            const updatedEmployee = await employee.increment('hourBalance', { by: totalDailyBalance });
-            const newBalance = updatedEmployee.hourBalance; // Pega o novo saldo atualizado
-
-            logger.info(`[BalanceService] Saldo atualizado para Employee ${employeeId}. Dia: ${date.toISOString().split('T')[0]}, Saldo do Dia: ${totalDailyBalance.toFixed(2)}, Novo Saldo Acumulado: ${newBalance.toFixed(2)}`);
-
-            return newBalance;
-
-        } catch (error) {
-            logger.error(`[BalanceService] Erro ao atualizar saldo para Employee ${employeeId} na data ${date.toISOString()}:`, error);
-            return null;
-        }
-    }
-
-    /**
-    * Calcula e retorna o histórico de saldo para um período.
-    * @param {number} employeeId
-    * @param {Date} startDate
-    * @param {Date} endDate
-    * @returns {Promise<Array<object>>} Array com { date, workedHours, dailyGoal, dailyBalance }
-    */
     async getBalanceHistory(employeeId, startDate, endDate) {
         try {
-            const employee = await Employee.findByPk(employeeId);
+            const employee = await Employee.findByPk(employeeId); // Precisa dos dados do employee
             if (!employee) throw new Error("Funcionário não encontrado.");
 
-            // Garante que endDate inclua o dia inteiro
             const endOfDay = new Date(endDate);
             endOfDay.setHours(23, 59, 59, 999);
 
             const records = await TimeRecord.findAll({
                 where: {
                     employeeId: employeeId,
-                    startTime: {
-                        [Op.gte]: startDate,
-                        [Op.lte]: endOfDay // Usa lte para incluir o último dia
-                    },
-                    endTime: { [Op.ne]: null } // Apenas finalizados
+                    startTime: { [Op.gte]: startDate, [Op.lte]: endOfDay },
+                    endTime: { [Op.ne]: null }
                 },
-                order: [['startTime', 'ASC']] // Ordena do mais antigo para o mais novo
+                order: [['startTime', 'ASC']]
             });
 
             const history = records.map(record => {
                 const dailyGoal = this._calculateDailyGoal(parseFloat(employee.weeklyHours));
                 const workedHours = record.totalHours ? parseFloat(record.totalHours) : 0;
-                const dailyBalance = this.calculateDailyBalance(record, employee) || 0; // Usa 0 se não puder calcular
+                // Usa calculateDailyBalance para obter o saldo daquele registro específico
+                const dailyBalance = this.calculateDailyBalance(record, employee) ?? 0; // Usa 0 se retornar null
 
                 return {
-                    id: record.id,
-                    date: record.startTime, // Ou formatar a data aqui
+                    id: record.id, // Inclui o ID do registro
+                    date: record.startTime,
                     workedHours: workedHours.toFixed(2),
                     dailyGoal: dailyGoal.toFixed(2),
                     dailyBalance: dailyBalance.toFixed(2),
-                    notes: record.notes // Incluir notas se existirem
+                    notes: record.notes
                 };
             });
 

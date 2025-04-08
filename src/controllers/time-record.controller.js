@@ -14,7 +14,7 @@ class TimeRecordController {
     this.checkIn = this.checkIn.bind(this);
     this.startLunch = this.startLunch.bind(this);
     this.endLunch = this.endLunch.bind(this);
-    this.checkOut = this.checkOut.bind(this); // Manter apenas uma versão
+    this.checkOut = this.checkOut.bind(this);
     this.getHistory = this.getHistory.bind(this);
     this.getTodaysRecord = this.getTodaysRecord.bind(this);
     this.getBalanceHistory = this.getBalanceHistory.bind(this);
@@ -82,12 +82,12 @@ class TimeRecordController {
 
   /**
    * @route POST /api/time-records/lunch-start
-   * @description Registra o início do intervalo de almoço. (Não recalcula saldo aqui)
+   * @description Registra o início do intervalo de almoço.
    */
   async startLunch(req, res) {
     const employeeId = req.user.id;
     try {
-      const record = await this._findOpenRecordToday(employeeId);
+      const record = await this._findOpenRecordToday(employeeId); // Encontra registro aberto
       if (!record) return sendResponse(res, 404, 'Check-in não encontrado ou já finalizado.');
       if (record.lunchStartTime) return sendResponse(res, 409, 'Saída para almoço já registrada.');
       if (record.endTime) return sendResponse(res, 400, 'Não é possível registrar almoço após o check-out.');
@@ -104,7 +104,7 @@ class TimeRecordController {
 
   /**
    * @route POST /api/time-records/lunch-end
-   * @description Registra o fim do intervalo de almoço. (Não recalcula saldo aqui)
+   * @description Registra o fim do intervalo de almoço.
    */
   async endLunch(req, res) {
     const employeeId = req.user.id;
@@ -130,49 +130,40 @@ class TimeRecordController {
 
   /**
    * @route POST /api/time-records/check-out
-   * @description Registra o fim do expediente, calcula horas totais e ATUALIZA O SALDO.
+   * @description Registra o fim do expediente, calcula horas totais e ATUALIZA O SALDO ACUMULADO.
    */
   async checkOut(req, res) {
     const employeeId = req.user.id;
-    // Inicia uma transação para garantir que salvar e recalcular ocorram juntos
     const transaction = await sequelize.transaction();
     try {
-      const record = await this._findOpenRecordToday(employeeId); // Busca fora da transação é OK
+      const record = await this._findOpenRecordToday(employeeId);
       if (!record) { await transaction.rollback(); return sendResponse(res, 404, 'Nenhum check-in aberto encontrado.'); }
-
       record.endTime = new Date();
-      // Validações de horário
-      if (record.endTime <= record.startTime) { await transaction.rollback(); return sendResponse(res, 400, 'Check-out deve ser posterior ao check-in.'); }
-      if (record.lunchEndTime && record.endTime <= record.lunchEndTime) { await transaction.rollback(); return sendResponse(res, 400, 'Check-out deve ser posterior ao retorno do almoço.'); }
+      if (record.endTime <= record.startTime || (record.lunchEndTime && record.endTime <= record.lunchEndTime)) {
+        await transaction.rollback(); return sendResponse(res, 400, 'Horário de check-out inválido.');
+      }
       // TODO: Adicionar regra de negócio se almoço for obrigatório?
 
-      // Salva o registro DENTRO da transação (hook beforeSave calcula totalHours)
-      await record.save({ transaction });
-      logger.info(`Check-out registrado para employeeId ${employeeId}. Record ID: ${record.id}, Horas: ${record.totalHours}`);
+      await record.save({ transaction }); // Hook calcula totalHours
+      logger.info(`Check-out salvo para Employee ${employeeId}. Record ID: ${record.id}, Horas: ${record.totalHours}`);
 
-      // --- ATUALIZAÇÃO: Recalcula o saldo para o dia do registro ---
-      logger.info(`Iniciando recálculo de saldo para Employee ${employeeId} após check-out.`);
-      const recalculated = await BalanceService.recalculateAndUpdateBalanceForDate(employeeId, record.startTime, transaction);
-      if (!recalculated) {
-        // Loga o erro mas commita o ponto mesmo assim. O job diário pode corrigir.
-        logger.error(`Falha ao recalcular saldo após check-out para Employee ${employeeId} no dia ${record.startTime.toISOString().split('T')[0]}. Ponto salvo, mas saldo pode estar inconsistente até próximo recálculo.`);
-        // Se quisesse reverter:
-        // await transaction.rollback();
-        // return sendResponse(res, 500, 'Erro ao recalcular saldo após check-out.');
+      // Calcula o saldo apenas deste dia e o adiciona ao acumulado
+      const dailyBalance = await BalanceService.calculateDailyBalanceForDate(employeeId, record.startTime, transaction);
+      logger.info(`Saldo do dia ${record.startTime.toISOString().split('T')[0]} calculado: ${dailyBalance}h. Atualizando saldo acumulado...`);
+      const balanceUpdated = await BalanceService.updateAccumulatedBalance(employeeId, dailyBalance, transaction);
+
+      if (!balanceUpdated) {
+        logger.error(`Falha ao ATUALIZAR saldo acumulado após check-out para Employee ${employeeId}. Ponto salvo, mas saldo inconsistente.`);
+        // Não reverte, mas loga o erro. Job diário pode corrigir.
       } else {
-        logger.info(`Recálculo de saldo para Employee ${employeeId} concluído após check-out.`);
+        logger.info(`Saldo acumulado atualizado para Employee ${employeeId} após check-out.`);
       }
 
-      // Commita a transação (salvar ponto e tentativa de atualizar saldo)
       await transaction.commit();
-
       sendResponse(res, 200, 'Check-out registrado e saldo atualizado.', record);
 
     } catch (error) {
-      // Garante rollback se algo der errado ANTES do commit
-      if (transaction && !transaction.finished) { // Verifica se a transação ainda está ativa
-        await transaction.rollback();
-      }
+      if (transaction && !transaction.finished) await transaction.rollback();
       logger.error(`Erro no check-out (Employee ${employeeId}):`, error);
       sendResponse(res, 500, 'Erro interno no servidor ao registrar check-out.');
     }
@@ -205,8 +196,7 @@ class TimeRecordController {
     try {
       const openRecord = await this._findOpenRecordToday(employeeId);
       if (openRecord) { return sendResponse(res, 200, 'Registro de hoje encontrado (em andamento).', openRecord); }
-      const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
-      const todayEnd = new Date(todayStart); todayEnd.setDate(todayStart.getDate() + 1);
+      const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0); const todayEnd = new Date(todayStart); todayEnd.setDate(todayStart.getDate() + 1);
       const closedRecord = await TimeRecord.findOne({ where: { employeeId: employeeId, startTime: { [Op.gte]: todayStart, [Op.lt]: todayEnd }, endTime: { [Op.ne]: null } }, order: [['startTime', 'DESC']] });
       if (closedRecord) { return sendResponse(res, 200, 'Registro de hoje encontrado (já finalizado).', closedRecord); }
       return sendResponse(res, 404, 'Nenhum registro de ponto encontrado para hoje.');
@@ -227,11 +217,9 @@ class TimeRecordController {
     try {
       if (isNaN(requestedEmployeeId)) return sendResponse(res, 400, 'ID do funcionário inválido.');
       if (loggedInUserRole !== 'admin' && loggedInUserId !== requestedEmployeeId) { return sendResponse(res, 403, 'Acesso negado.'); }
-      let startDate, endDate;
-      const defaultEndDate = new Date(); const defaultStartDate = new Date(defaultEndDate); defaultStartDate.setDate(defaultEndDate.getDate() - 30);
-      try {
-        startDate = startDateStr ? new Date(startDateStr + 'T00:00:00Z') : defaultStartDate; endDate = endDateStr ? new Date(endDateStr + 'T23:59:59Z') : defaultEndDate; if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) throw new Error('Formato de data inválido (use YYYY-MM-DD).'); if (startDate > endDate) throw new Error('Data inicial não pode ser maior que a data final.');
-      } catch (dateError) { return sendResponse(res, 400, dateError.message); }
+      let startDate, endDate; const defaultEndDate = new Date(); const defaultStartDate = new Date(defaultEndDate); defaultStartDate.setDate(defaultEndDate.getDate() - 30);
+      try { startDate = startDateStr ? new Date(startDateStr + 'T00:00:00Z') : defaultStartDate; endDate = endDateStr ? new Date(endDateStr + 'T23:59:59Z') : defaultEndDate; if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) throw new Error('Formato inválido.'); if (startDate > endDate) throw new Error('Data inicial maior que final.'); } catch (dateError) { return sendResponse(res, 400, dateError.message); }
+      // Chama o serviço que agora inclui o ID do registro
       const history = await BalanceService.getBalanceHistory(requestedEmployeeId, startDate, endDate);
       sendResponse(res, 200, 'Histórico de saldo recuperado.', history);
     } catch (error) {
@@ -245,42 +233,52 @@ class TimeRecordController {
 
   /**
    * @route DELETE /api/time-records/:recordId
-   * @description Remove um registro de ponto específico e RECALCULA O SALDO. Acesso: Admin.
+   * @description Remove um registro e AJUSTA O SALDO ACUMULADO. Acesso: Admin.
    */
   async deleteRecord(req, res) {
     const { recordId } = req.params;
     const adminUserId = req.user.id;
-    const transaction = await sequelize.transaction(); // Inicia transação
+    const transaction = await sequelize.transaction();
     try {
       logger.info(`[Admin Action] Tentativa de remover registro ID ${recordId} por Admin ID ${adminUserId}.`);
-      const record = await TimeRecord.findByPk(recordId, { transaction }); // Busca na transação
+      const record = await TimeRecord.findByPk(recordId, { transaction });
       if (!record) { await transaction.rollback(); return sendResponse(res, 404, 'Registro de ponto não encontrado.'); }
 
       const employeeIdAffected = record.employeeId;
-      const dateAffected = record.startTime;
+      let balanceToRemove = 0;
 
-      await record.destroy({ transaction }); // Deleta na transação
-      logger.info(`[Admin Action] Registro ID ${recordId} removido (Funcionário ID ${employeeIdAffected}) por Admin ID ${adminUserId}.`);
+      // Calcula o saldo que este registro representava ANTES de deletar
+      if (record.endTime) { // Só recalcula se estava finalizado
+        const employee = await Employee.findByPk(employeeIdAffected, { attributes: ['weeklyHours'], transaction });
+        if (employee) { balanceToRemove = BalanceService.calculateDailyBalance(record, employee) ?? 0; }
+      }
+      balanceToRemove = parseFloat(balanceToRemove.toFixed(2));
+      logger.info(`[Admin Action] Registro ${recordId} a ser removido tinha saldo diário de ${balanceToRemove}h.`);
 
-      // --- ATUALIZAÇÃO: Recalcula o saldo para o dia afetado ---
-      logger.info(`Iniciando recálculo de saldo para Employee ${employeeIdAffected} após deleção.`);
-      const recalculated = await BalanceService.recalculateAndUpdateBalanceForDate(employeeIdAffected, dateAffected, transaction);
-      if (!recalculated) {
-        logger.error(`Falha ao recalcular saldo após deleção do registro ${recordId}. Revertendo deleção.`);
-        await transaction.rollback(); // Reverte a deleção se o recálculo falhar
-        return sendResponse(res, 500, 'Erro ao recalcular saldo após remover registro.');
+      // Remove o registro
+      await record.destroy({ transaction });
+      logger.info(`[Admin Action] Registro ID ${recordId} removido.`);
+
+      // SUBTRAI o saldo do registro deletado do acumulado
+      if (balanceToRemove !== 0) {
+        logger.info(`Ajustando saldo acumulado para Employee ${employeeIdAffected} por -${balanceToRemove}h.`);
+        const balanceUpdated = await BalanceService.updateAccumulatedBalance(employeeIdAffected, -balanceToRemove, transaction); // Passa valor NEGATIVO
+        if (!balanceUpdated) {
+          logger.error(`Falha ao AJUSTAR saldo acumulado após deleção do registro ${recordId}. Revertendo.`);
+          await transaction.rollback();
+          return sendResponse(res, 500, 'Erro ao ajustar saldo acumulado após remover registro.');
+        } else {
+          logger.info(`Saldo acumulado ajustado para Employee ${employeeIdAffected} após deleção.`);
+        }
       } else {
-        logger.info(`Recálculo de saldo para Employee ${employeeIdAffected} concluído após deleção.`);
+        logger.info(`[Admin Action] Registro ${recordId} não estava finalizado ou saldo era zero. Saldo acumulado não alterado.`);
       }
 
-      await transaction.commit(); // Commita deleção e recálculo
-      sendResponse(res, 200, 'Registro de ponto removido e saldo recalculado.');
+      await transaction.commit();
+      sendResponse(res, 200, 'Registro de ponto removido e saldo ajustado.');
 
     } catch (error) {
-      // Garante rollback se algo der errado ANTES do commit
-      if (transaction && !transaction.finished) {
-        await transaction.rollback();
-      }
+      if (transaction && !transaction.finished) await transaction.rollback();
       logger.error(`[Admin Action] Erro ao remover registro ID ${recordId} por Admin ID ${adminUserId}:`, error);
       sendResponse(res, 500, 'Erro interno ao remover registro de ponto.');
     }
@@ -288,56 +286,52 @@ class TimeRecordController {
 
   /**
    * @route POST /api/time-records/manual
-   * @description Cria um registro manual e RECALCULA O SALDO. Acesso: Admin.
+   * @description Cria um registro manual e ATUALIZA O SALDO ACUMULADO. Acesso: Admin.
    */
   async createManualRecord(req, res) {
     const adminUserId = req.user.id;
     const { employeeId, date, startTime, endTime, lunchStartTime, lunchEndTime, reason } = req.body;
-    const transaction = await sequelize.transaction(); // Inicia transação
+    const transaction = await sequelize.transaction();
 
     logger.info(`[Admin Action] Tentativa de criar registro manual para Employee ${employeeId} por Admin ${adminUserId}. Data: ${date}`);
-    if (!employeeId || !date || !startTime || !endTime) { await transaction.rollback(); return sendResponse(res, 400, 'Campos obrigatórios ausentes: employeeId, date, startTime, endTime.'); }
+    if (!employeeId || !date || !startTime || !endTime) { await transaction.rollback(); return sendResponse(res, 400, 'Campos obrigatórios ausentes.'); }
 
     try {
-      const employee = await Employee.findByPk(employeeId, { transaction });
+      const employee = await Employee.findByPk(employeeId, { attributes: ['id', 'weeklyHours'], transaction }); // Pega weeklyHours para calcular saldo
       if (!employee) { await transaction.rollback(); return sendResponse(res, 404, 'Funcionário não encontrado.'); }
 
       let startDateTime, endDateTime, lunchStartDateTime = null, lunchEndDateTime = null;
       try { // Parse e validação de datas/horas
         startDateTime = new Date(`${date}T${startTime}`); endDateTime = new Date(`${date}T${endTime}`);
         if (lunchStartTime) lunchStartDateTime = new Date(`${date}T${lunchStartTime}`); if (lunchEndTime) lunchEndDateTime = new Date(`${date}T${lunchEndTime}`);
-        if (isNaN(startDateTime.getTime()) || isNaN(endDateTime.getTime()) || (lunchStartDateTime && isNaN(lunchStartDateTime.getTime())) || (lunchEndDateTime && isNaN(lunchEndDateTime.getTime()))) { throw new Error('Formato de data/hora inválido.'); }
-        if (endDateTime <= startDateTime) throw new Error('Fim deve ser após início.'); if (lunchStartDateTime && lunchEndDateTime && lunchEndDateTime <= lunchStartDateTime) throw new Error('Fim do almoço deve ser após início.'); if (lunchStartDateTime && lunchStartDateTime <= startDateTime) throw new Error('Início do almoço deve ser após entrada.'); if (lunchEndDateTime && endDateTime <= lunchEndDateTime) throw new Error('Fim do expediente deve ser após fim do almoço.');
-      } catch (parseError) { await transaction.rollback(); logger.warn(`[Admin Action] Erro de validação data/hora manual: ${parseError.message}`, req.body); return sendResponse(res, 400, parseError.message); }
+        if (isNaN(startDateTime.getTime()) || isNaN(endDateTime.getTime()) || (lunchStartDateTime && isNaN(lunchStartDateTime.getTime())) || (lunchEndDateTime && isNaN(lunchEndDateTime.getTime()))) { throw new Error('Formato inválido.'); }
+        if (endDateTime <= startDateTime) throw new Error('Fim antes do início.'); if (lunchStartDateTime && lunchEndDateTime && lunchEndDateTime <= lunchStartDateTime) throw new Error('Fim almoço antes início almoço.'); if (lunchStartDateTime && lunchStartDateTime <= startDateTime) throw new Error('Início almoço antes entrada.'); if (lunchEndDateTime && endDateTime <= lunchEndDateTime) throw new Error('Fim expediente antes fim almoço.');
+      } catch (parseError) { await transaction.rollback(); logger.warn(`[Admin Action] Erro validação data/hora manual: ${parseError.message}`, req.body); return sendResponse(res, 400, parseError.message); }
 
-      // Cria o registro na transação
-      const newRecord = await TimeRecord.create({
-        employeeId, startTime: startDateTime, endTime: endDateTime,
-        lunchStartTime: lunchStartDateTime, lunchEndTime: lunchEndDateTime,
-        // edited_by_admin_id: adminUserId, edit_reason: reason || 'Criação manual'
-      }, { transaction }); // Hook beforeSave calculará totalHours
+      // Cria o registro na transação (Hook calcula totalHours)
+      const newRecord = await TimeRecord.create({ employeeId, startTime: startDateTime, endTime: endDateTime, lunchStartTime: lunchStartDateTime, lunchEndTime: lunchEndDateTime, /*... auditoria ...*/ }, { transaction });
+      logger.info(`[Admin Action] Registro manual criado (ID: ${newRecord.id}) para Funcionário ID ${employeeId}. Horas: ${newRecord.totalHours}`);
 
-      logger.info(`[Admin Action] Registro manual criado (ID: ${newRecord.id}) para Funcionário ID ${employeeId}.`);
+      // Calcula o saldo DESTE DIA (usando os dados do registro recém-criado e do funcionário)
+      const dailyBalance = BalanceService.calculateDailyBalance(newRecord, employee) ?? 0; // Usa o método que recebe o registro
+      logger.info(`Saldo do dia ${date} calculado: ${dailyBalance}h. Atualizando saldo acumulado...`);
 
-      // --- ATUALIZAÇÃO: Recalcula o saldo para o dia afetado ---
-      logger.info(`Iniciando recálculo de saldo para Employee ${employeeId} após criação manual.`);
-      const recalculated = await BalanceService.recalculateAndUpdateBalanceForDate(employeeId, startDateTime, transaction);
-      if (!recalculated) {
-        logger.error(`Falha ao recalcular saldo após criação manual do registro ${newRecord.id}. Revertendo criação.`);
-        await transaction.rollback(); // Reverte a criação se o recálculo falhar
-        return sendResponse(res, 500, 'Erro ao recalcular saldo após criar registro.');
+      // Adiciona o saldo deste dia ao acumulado
+      const balanceUpdated = await BalanceService.updateAccumulatedBalance(employeeId, dailyBalance, transaction);
+
+      if (!balanceUpdated) {
+        logger.error(`Falha ao ATUALIZAR saldo acumulado após criação manual do registro ${newRecord.id}. Revertendo.`);
+        await transaction.rollback();
+        return sendResponse(res, 500, 'Erro ao atualizar saldo acumulado após criar registro.');
       } else {
-        logger.info(`Recálculo de saldo para Employee ${employeeId} concluído após criação manual.`);
+        logger.info(`Saldo acumulado atualizado para Employee ${employeeId} após criação manual.`);
       }
 
-      await transaction.commit(); // Commita criação e recálculo
-      sendResponse(res, 201, 'Registro manual criado e saldo recalculado.', newRecord);
+      await transaction.commit();
+      sendResponse(res, 201, 'Registro manual criado e saldo atualizado.', newRecord);
 
     } catch (error) {
-      // Garante rollback se algo der errado ANTES do commit
-      if (transaction && !transaction.finished) {
-        await transaction.rollback();
-      }
+      if (transaction && !transaction.finished) await transaction.rollback();
       logger.error(`[Admin Action] Erro ao criar registro manual para Employee ${employeeId}:`, error);
       if (error.name === 'SequelizeValidationError') { return sendResponse(res, 400, `Erro de validação: ${error.errors.map(e => e.message).join('; ')}`); }
       sendResponse(res, 500, 'Erro interno ao criar registro manual.');
