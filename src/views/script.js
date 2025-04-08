@@ -336,10 +336,33 @@ class PontoApp {
   }
 
   renderProfileModalContent(employee, history) {
+
+    <td>
+      ${parseFloat(h.dailyBalance) > 0 ? '+' : ''}${h.dailyBalance}h
+      // ADICIONAR BOTÃO DE EXCLUSÃO (APENAS VISÍVEL PARA ADMIN)
+      <button class="btn btn-outline-danger btn-sm ms-2 delete-record-btn"
+        data-record-id="${h.id}" // ASSUMINDO que 'h' tenha o ID do registro
+        style="display: ${this.state.currentUser?.role === 'admin' ? 'inline-block' : 'none'};"
+        title="Remover este registro">
+        <i class="fas fa-trash-alt"></i>
+      </button>
+    </td>
+
     if (!this.ui.profileModalLabel || !this.ui.profileModalBody || !this.ui.profileAdminActions) { console.error("Elementos internos do Modal de Perfil não encontrados para renderizar."); return; }
     this.ui.profileModalLabel.textContent = `Perfil de ${employee.fullName}`; let age = 'N/A'; if (employee.birthDate) { try { const birthDate = new Date(employee.birthDate); const today = new Date(); age = today.getFullYear() - birthDate.getFullYear(); const m = today.getMonth() - birthDate.getMonth(); if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) { age--; } } catch { age = 'Inválida'; } } const balance = parseFloat(employee.hourBalance || 0); const formattedBalance = balance.toLocaleString('pt-BR', { style: 'decimal', minimumFractionDigits: 2, maximumFractionDigits: 2 }); let balanceText = formattedBalance + "h"; let balanceClass = 'balance-zero'; if (balance > 0.01) { balanceText = "+" + balanceText; balanceClass = 'balance-positive'; } else if (balance < -0.01) { balanceClass = 'balance-negative'; } let historyHtml = '<p class="text-muted text-center">Nenhum registro finalizado nos últimos 7 dias.</p>'; if (history && history.length > 0) { historyHtml = `<table class="table table-sm table-striped" id="balanceHistoryTable"><thead><tr><th>Data</th><th>Trabalhado</th><th>Meta</th><th>Saldo Dia</th></tr></thead><tbody>${history.map(h => `<tr><td>${new Date(h.date).toLocaleDateString('pt-BR')}</td><td>${h.workedHours}h</td><td>${h.dailyGoal}h</td><td class="${parseFloat(h.dailyBalance) > 0.01 ? 'balance-positive' : (parseFloat(h.dailyBalance) < -0.01 ? 'balance-negative' : '')}">${parseFloat(h.dailyBalance) > 0 ? '+' : ''}${h.dailyBalance}h</td></tr>`).join('')}</tbody></table>`; }
     this.ui.profileModalBody.innerHTML = `<div class="row mb-4"><div class="col-md-4 text-center"><img src="${employee.photoUrl || 'assets/default-avatar.png'}" alt="Foto de ${employee.fullName}" class="img-fluid profile-photo mb-2" onerror="this.onerror=null; this.src='assets/default-avatar.png';"><span class="badge bg-${employee.isActive ? 'success' : 'danger'}">${employee.isActive ? 'Ativo' : 'Inativo'}</span></div><div class="col-md-8"><h4>${employee.fullName}</h4><p class="text-muted mb-1">${employee.role}</p><p><i class="fas fa-envelope fa-fw me-2"></i>${employee.email}</p><p><i class="fas fa-birthday-cake fa-fw me-2"></i>${age} anos ${employee.birthDate ? '(' + new Date(employee.birthDate).toLocaleDateString('pt-BR') + ')' : ''}</p><p><i class="fas fa-calendar-alt fa-fw me-2"></i>Admissão: ${employee.hireDate ? new Date(employee.hireDate).toLocaleDateString('pt-BR') : 'N/A'}</p><p><i class="fas fa-briefcase fa-fw me-2"></i>Carga Semanal: ${employee.weeklyHours} horas</p><hr><p class="mb-1"><strong>Saldo Banco de Horas:</strong></p><h3 class="fw-bold ${balanceClass}">${balanceText}</h3></div></div><h5>Histórico Recente (Últimos 7 dias)</h5>${historyHtml}`;
     if (this.state.currentUser?.role === 'admin') { this.ui.profileAdminActions.style.display = 'block'; const btnToggle = this.ui.btnToggleActiveStatus; if (btnToggle) { if (employee.isActive) { btnToggle.innerHTML = '<i class="fas fa-power-off me-1"></i> Desativar'; btnToggle.classList.remove('btn-success'); btnToggle.classList.add('btn-danger'); } else { btnToggle.innerHTML = '<i class="fas fa-power-off me-1"></i> Ativar'; btnToggle.classList.remove('btn-danger'); btnToggle.classList.add('btn-success'); } } else { console.error("Botão Toggle Status não encontrado no modal de perfil"); } } else { if (this.ui.profileAdminActions) this.ui.profileAdminActions.style.display = 'none'; }
+
+    this.ui.profileModalBody.querySelectorAll('.delete-record-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        const recordId = e.currentTarget.dataset.recordId;
+        const employeeName = employee.fullName; // Pega nome para confirmação
+        if (confirm(`Tem certeza que deseja remover o registro #${recordId} de ${employeeName}? Esta ação não pode ser desfeita.`)) {
+          await this.handleDeleteRecord(recordId, employee.id); // Passa employeeId para recarregar perfil
+        }
+      });
+    });
+
   }
 
   editProfileFromModal() {
@@ -361,6 +384,41 @@ class PontoApp {
       const response = await this.fetchWithAuth('/api/employees?active=all'); if (!response) return; const result = await response.json(); if (!response.ok || !result.success) throw new Error(result.message || `Erro ${response.status}`); this.state.employeeList = result.data; this.renderAdminEmployeeTable();
     } catch (error) { if (error.message !== 'Não autorizado') { console.error("Erro ao carregar lista admin:", error); this.ui.employeeListTableBody.innerHTML = `<tr><td colspan="6" class="text-center text-danger">Erro ao carregar funcionários: ${error.message}</td></tr>`; } }
   }
+
+  async handleDeleteRecord(recordId, employeeIdToRefresh) {
+    console.log(`[Admin] Deletando registro ID: ${recordId}`);
+    try {
+      const response = await this.fetchWithAuth(`/api/time-records/${recordId}`, {
+        method: 'DELETE'
+      });
+      // Se fetchWithAuth tratar erro 401/403 e rejeitar, o catch abaixo pega
+      if (!response) return;
+
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || `Erro ${response.status}`);
+      }
+      this.showAlert('success', 'Registro removido com sucesso!');
+      // Recarrega o modal do perfil para mostrar o histórico atualizado
+      this.showProfileModal(employeeIdToRefresh);
+      // Se a visão admin estiver ativa, recarrega a lista também (pode afetar saldo)
+      if (this.state.currentView === 'admin') {
+        this.loadAndDisplayAdminEmployeeList();
+      }
+      // Atualiza o resumo do dashboard se estiver visível
+      if (this.state.currentView === 'dashboard') {
+        this.fetchAndUpdateSummary();
+      }
+
+    } catch (error) {
+      if (error.message !== 'Não autorizado') { // Evita alerta duplicado
+        console.error(`Erro ao remover registro ${recordId}:`, error);
+        this.showAlert('danger', `Falha ao remover registro: ${error.message}`);
+      }
+    }
+  }
+
+
 
   renderAdminEmployeeTable() {
     if (!this.ui.employeeListTableBody) return; if (this.state.employeeList.length === 0) { this.ui.employeeListTableBody.innerHTML = `<tr><td colspan="6" class="text-center text-muted">Nenhum funcionário cadastrado.</td></tr>`; return; }
