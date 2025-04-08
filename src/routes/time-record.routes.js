@@ -2,50 +2,41 @@
 const express = require('express');
 const router = express.Router();
 const timeRecordController = require('../controllers/time-record.controller');
-const { authenticate } = require('../middlewares/auth.middleware'); // Middleware de autenticação
+
+// --- CORREÇÃO: Importar 'authenticate' E 'authorize' ---
+const { authenticate, authorize } = require('../middlewares/auth.middleware');
+// --------------------------------------------------------
 
 // === ROTAS PARA /api/time-records ===
 
-// Aplicar autenticação a todas as rotas abaixo, pois todas exigem um usuário logado
+// Aplica autenticação básica a todas as rotas abaixo
 router.use(authenticate);
 
-// Registrar Check-in (Início do expediente)
+// --- Rotas do Funcionário ---
 router.post('/check-in', timeRecordController.checkIn);
-
-// Registrar Saída para Almoço
 router.post('/lunch-start', timeRecordController.startLunch);
-
-// Registrar Retorno do Almoço
 router.post('/lunch-end', timeRecordController.endLunch);
-
-// Registrar Check-out (Fim do expediente)
 router.post('/check-out', timeRecordController.checkOut);
-
-// Obter o registro de ponto de HOJE para o usuário logado
 router.get('/today', timeRecordController.getTodaysRecord);
-
-// Obter o HISTÓRICO SIMPLES de registros para um funcionário específico (ID na URL)
-// A verificação de permissão (admin vs próprio usuário) é feita no controller
+// Histórico simples e com saldo são acessíveis por funcionário (para si) e admin
 router.get('/employee/:employeeId', timeRecordController.getHistory);
-
-// Obter o HISTÓRICO COM SALDO CALCULADO para um funcionário específico (ID na URL)
-// Acesso verificado no controller. Recebe query params opcionais startDate e endDate.
 router.get('/employee/:employeeId/balance-history', timeRecordController.getBalanceHistory);
-// ----------------------
 
 // --- Rotas Administrativas ---
 
 // Remover um registro de ponto específico (Admin Only)
+// A linha 39 agora terá 'authorize' definido
 router.delete(
-    '/:recordId(\\d+)', // Garante que recordId seja numérico
-    authorize(['admin']), // Somente admin pode deletar
+    '/:recordId(\\d+)',   // Garante que recordId seja numérico
+    authorize(['admin']), // Somente admin pode deletar (authorize agora está definido)
     timeRecordController.deleteRecord
 );
 
 // Criar um registro de ponto manualmente (Admin Only)
 router.post(
     '/manual',
-    authorize(['admin']), // Somente admin pode criar manualmente
+    authorize(['admin']), // Somente admin pode criar manualmente (authorize agora está definido)
+    // TODO: Adicionar um middleware de validação específico para os dados manuais?
     timeRecordController.createManualRecord
 );
 
