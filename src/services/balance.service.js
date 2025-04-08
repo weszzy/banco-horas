@@ -1,6 +1,6 @@
 const { TimeRecord } = require('../models/time-record.model');
 const { Employee } = require('../models/employee.model');
-const { Op } = require('sequelize');
+const { Op, Sequelize } = require('sequelize');
 const logger = require('../utils/logger.util');
 
 class BalanceService {
@@ -43,6 +43,117 @@ class BalanceService {
         const dailyBalance = workedHours - dailyGoal;
         return dailyBalance; // Pode ser positivo ou negativo
     }
+
+    /**
+        * Recalcula o saldo de horas trabalhadas versus meta para um funcionário
+        * em um dia específico e atualiza o saldo acumulado (hour_balance).
+        *
+        * @param {number} employeeId - ID do funcionário.
+        * @param {Date | string} dateOrDateString - A data (objeto Date ou string 'YYYY-MM-DD') para recalcular.
+        * @param {Sequelize.Transaction} [transaction] - Transação opcional do Sequelize.
+        * @returns {Promise<boolean>} True se o saldo foi recalculado (mesmo que não tenha mudado), false se erro ou funcionário inativo.
+        */
+    async recalculateAndUpdateBalanceForDate(employeeId, dateOrDateString, transaction = null) {
+        const operationDate = new Date(dateOrDateString); // Converte string para Date se necessário
+        if (isNaN(operationDate.getTime())) {
+            logger.error(`[BalanceService] Data inválida fornecida para recálculo: ${dateOrDateString}`);
+            return false;
+        }
+
+        // Garante que estamos pegando o dia inteiro no fuso horário do servidor/DB
+        const dayStart = new Date(operationDate);
+        dayStart.setHours(0, 0, 0, 0);
+        const dayEnd = new Date(dayStart);
+        dayEnd.setDate(dayStart.getDate() + 1);
+
+        logger.info(`[BalanceService] Recalculando saldo para Employee ${employeeId} na data ${dayStart.toISOString().split('T')[0]}...`);
+
+        try {
+            const employee = await Employee.findByPk(employeeId, { transaction }); // Usa transação se fornecida
+            if (!employee) {
+                logger.error(`[BalanceService] Funcionário ${employeeId} não encontrado para recálculo.`);
+                return false;
+            }
+            if (!employee.isActive) {
+                logger.info(`[BalanceService] Funcionário ${employeeId} inativo. Recálculo pulado.`);
+                return true; // Considera sucesso, pois não há o que fazer
+            }
+
+            // Calcula o saldo ANTERIOR para este dia (se já existia)
+            // Isso é importante para aplicar apenas a DIFERENÇA no saldo acumulado
+            // Vamos simplificar por agora e recalcular o saldo acumulado desde o início do dia
+            // TODO: Implementar lógica de saldo delta para maior precisão com edições múltiplas
+
+            // --- Recálculo do Saldo do Dia ---
+            // Busca todos os registros FINALIZADOS para o dia
+            const records = await TimeRecord.findAll({
+                where: {
+                    employeeId: employeeId,
+                    startTime: { [Op.gte]: dayStart, [Op.lt]: dayEnd },
+                    endTime: { [Op.ne]: null } // Apenas registros com check-out
+                },
+                transaction // Usa transação
+            });
+
+            let totalWorkedHoursToday = 0;
+            if (records.length > 0) {
+                // Soma as horas totais de todos os registros do dia
+                // parseFloat é crucial pois totalHours é DECIMAL
+                totalWorkedHoursToday = records.reduce((sum, record) => sum + (record.totalHours ? parseFloat(record.totalHours) : 0), 0);
+            }
+            logger.info(`[BalanceService] Total trabalhado em ${dayStart.toISOString().split('T')[0]} por Employee ${employeeId}: ${totalWorkedHoursToday.toFixed(2)}h`);
+
+
+            // Calcula a meta diária
+            const dailyGoal = this._calculateDailyGoal(parseFloat(employee.weeklyHours));
+            logger.info(`[BalanceService] Meta diária para Employee ${employeeId}: ${dailyGoal.toFixed(2)}h`);
+
+            // Calcula o saldo APENAS para este dia
+            const currentDailyBalance = totalWorkedHoursToday - dailyGoal;
+            logger.info(`[BalanceService] Saldo calculado para o dia ${dayStart.toISOString().split('T')[0]}: ${currentDailyBalance.toFixed(2)}h`);
+
+
+            // --- ATUALIZAÇÃO DO SALDO ACUMULADO ---
+            // Esta é uma simplificação. Uma abordagem robusta recalcularia TUDO ou usaria deltas.
+            // Vamos recalcular o saldo TOTAL acumulado varrendo todos os registros finalizados até o fim do dia.
+            const allFinishedRecords = await TimeRecord.findAll({
+                where: {
+                    employeeId: employeeId,
+                    endTime: {
+                        [Op.ne]: null, // Finalizados
+                        [Op.lt]: dayEnd  // Até o fim do dia recalculado
+                    }
+                },
+                order: [['startTime', 'ASC']], // Importante processar em ordem
+                transaction
+            });
+
+            let newAccumulatedBalance = 0;
+            for (const record of allFinishedRecords) {
+                const dailyBal = this.calculateDailyBalance(record, employee);
+                if (dailyBal !== null) {
+                    newAccumulatedBalance += dailyBal;
+                }
+            }
+
+            // Atualiza o saldo no funcionário
+            // Usamos update direto para garantir atomicidade se não estivermos em uma transação maior
+            await Employee.update(
+                { hourBalance: newAccumulatedBalance.toFixed(2) }, // Garante 2 casas decimais
+                { where: { id: employeeId }, transaction }
+            );
+
+            logger.info(`[BalanceService] Saldo acumulado RECALCULADO e atualizado para Employee ${employeeId}: ${newAccumulatedBalance.toFixed(2)}h`);
+
+            return true; // Indica que o recálculo foi tentado
+
+        } catch (error) {
+            logger.error(`[BalanceService] Erro GERAL ao recalcular saldo para Employee ${employeeId} na data ${operationDate.toISOString()}:`, error);
+            // Se estivermos em uma transação, ela pode ser revertida no nível superior
+            return false; // Indica falha
+        }
+    }
+
 
     /**
      * Atualiza o saldo acumulado de banco de horas para um funcionário
