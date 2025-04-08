@@ -150,6 +150,7 @@ class BalanceService {
                 const dailyBalance = this.calculateDailyBalance(record, employee) || 0; // Usa 0 se não puder calcular
 
                 return {
+                    id: record.id,
                     date: record.startTime, // Ou formatar a data aqui
                     workedHours: workedHours.toFixed(2),
                     dailyGoal: dailyGoal.toFixed(2),
