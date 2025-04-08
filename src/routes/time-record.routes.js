@@ -33,4 +33,20 @@ router.get('/employee/:employeeId', timeRecordController.getHistory);
 router.get('/employee/:employeeId/balance-history', timeRecordController.getBalanceHistory);
 // ----------------------
 
+// --- Rotas Administrativas ---
+
+// Remover um registro de ponto específico (Admin Only)
+router.delete(
+    '/:recordId(\\d+)', // Garante que recordId seja numérico
+    authorize(['admin']), // Somente admin pode deletar
+    timeRecordController.deleteRecord
+);
+
+// Criar um registro de ponto manualmente (Admin Only)
+router.post(
+    '/manual',
+    authorize(['admin']), // Somente admin pode criar manualmente
+    timeRecordController.createManualRecord
+);
+
 module.exports = router; // Exporta o router configurado
