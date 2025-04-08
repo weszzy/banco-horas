@@ -15,17 +15,165 @@ body {
 }
 
 .main-container {
-    padding-top: 1rem;
+    padding-top: 0.75rem;
+    /* Menos padding geral */
     padding-bottom: 1rem;
 }
 
 .alert-container {
     position: fixed;
-    top: 70px;
-    right: 20px;
+    top: 65px;
+    /* Logo abaixo da navbar */
+    left: 10px;
+    right: 10px;
     z-index: 1100;
-    min-width: 300px;
-    max-width: 90%;
+    width: auto;
+}
+
+/* Navbar */
+/* A área de login/logout pode precisar de ajuste de margem */
+#authArea .btn {
+    padding: 0.25rem 0.5rem;
+    /* Botão menor */
+    font-size: 0.875rem;
+}
+
+#authArea .navbar-text {
+    font-size: 0.9rem;
+    padding-right: 0.5rem !important;
+    /* Ajuste de espaçamento */
+}
+
+/* Offcanvas Menu */
+.offcanvas {
+    max-width: 80%;
+}
+
+@media (min-width: 576px) {
+    .offcanvas {
+        max-width: 300px;
+    }
+}
+
+.offcanvas .nav-link {
+    padding: 0.75rem 1rem;
+    color: rgba(255, 255, 255, 0.75);
+    display: flex;
+    /* Alinhar ícone e texto */
+    align-items: center;
+}
+
+.offcanvas .nav-link:hover,
+.offcanvas .nav-link.active {
+    color: #fff;
+    background-color: rgba(255, 255, 255, 0.1);
+    border-radius: 0.25rem;
+}
+
+.offcanvas .nav-separator {
+    /* Estilo dos separadores */
+    margin: 0.5rem 0;
+}
+
+/* Card de Resumo Rápido */
+#summaryBalanceMobile {
+    font-size: 2rem;
+    margin-bottom: 0.25rem;
+}
+
+#summaryLoadingMobile .spinner-border-sm {
+    width: 1.5rem;
+    /* Spinner um pouco maior */
+    height: 1.5rem;
+}
+
+.small {
+    font-size: 0.875em;
+}
+
+/* Card de Ações */
+#dashboardArea .card-header {
+    padding: 0.5rem 0.75rem;
+    /* Menos padding nos headers */
+}
+
+#dashboardArea .card-title {
+    font-size: 1rem;
+    /* Tamanho de título menor */
+}
+
+#dashboardArea .card-body {
+    padding: 0.75rem;
+}
+
+#dashboardArea .d-grid {
+    gap: 0.5rem !important;
+    /* Menor espaçamento entre botões */
+}
+
+#dashboardArea .btn-lg {
+    padding: 0.6rem 1rem;
+    /* Botões grandes um pouco menores */
+    font-size: 1.1rem;
+}
+
+#dashboardArea .btn i {
+    /* Ícones um pouco menores nos botões */
+    font-size: 0.9em;
+}
+
+/* Card de Status */
+#statusDetailsMobile .list-group-item {
+    padding: 0.4rem 0.25rem;
+    border: none;
+}
+
+#statusDetailsMobile .list-group-item strong {
+    margin-left: auto;
+    padding-left: 0.5rem;
+    font-weight: 600;
+    /* Deixa o valor mais destacado */
+}
+
+/* Tabela Admin */
+#adminArea .table {
+    font-size: 0.9rem;
+}
+
+#adminArea .table th, #adminArea .table td {
+    vertical-align: middle;
+    padding: 0.5rem;
+}
+
+#adminArea .table th:last-child, #adminArea .table td:last-child {
+    text-align: right;
+    white-space: nowrap;
+    padding-right: 0.75rem;
+}
+
+#adminArea .btn-group-sm>.btn {
+    margin-left: 0.25rem;
+    padding: 0.15rem 0.4rem;
+    font-size: 0.8rem;
+}
+
+/* Botões de ação menores */
+#adminArea .btn-group-sm>.btn:first-child {
+    margin-left: 0;
+}
+
+@media (max-width: 576px) {
+
+    #adminArea .table th:nth-child(2), #adminArea .table td:nth-child(2),
+    /* Esconde Email */
+    #adminArea .table th:nth-child(5), #adminArea .table td:nth-child(5) {
+        display: none;
+    }
+
+    /* Esconde Saldo */
+    #adminArea .table th:last-child, #adminArea .table td:last-child {
+        text-align: left;
+    }
 }
 
 /* Select2 */
@@ -55,42 +203,18 @@ body {
 
 .select2-container--open {
     z-index: 1056;
-    /* Acima do modal */
 }
 
-/* Ajustes específicos */
-#summaryBalance {
-    font-size: 3rem;
-    /* Ajusta tamanho do saldo */
+/* Acima do modal */
+.select2-container .select2-selection--single .select2-selection__rendered {
+    padding-right: 25px;
 }
 
-/* Tabela de gerenciamento */
-#adminArea .table th,
-#adminArea .table td {
-    vertical-align: middle;
-    /* Alinha conteúdo verticalmente */
-}
-
-#adminArea .table th:last-child,
-#adminArea .table td:last-child {
-    text-align: right;
-    /* Alinha ações à direita */
-    white-space: nowrap;
-    /* Evita quebra de linha nos botões */
-}
-
-#adminArea .btn-group-sm>.btn {
-    /* Espaçamento entre botões pequenos */
-    margin-left: 0.25rem;
-}
-
-#adminArea .btn-group-sm>.btn:first-child {
-    margin-left: 0;
-}
+/* Garante espaço para o X de limpar */
 
 /* Perfil Modal */
 #profileModalBody img.profile-photo {
-    max-width: 150px;
+    max-width: 120px;
     border-radius: 50%;
     margin-bottom: 1rem;
 }
@@ -107,32 +231,37 @@ body {
     color: var(--secondary-color);
 }
 
-#balanceHistoryTable th,
-#balanceHistoryTable td {
-    font-size: 0.9rem;
-    /* Tamanho menor para tabela de histórico */
-    padding: 0.5rem;
+#balanceHistoryTable th, #balanceHistoryTable td {
+    font-size: 0.85rem;
+    padding: 0.4rem;
 }
 
-/* Responsividade */
+/* Tabela de histórico menor ainda */
+#balanceHistoryTable td .btn-sm {
+    padding: 0.1rem 0.3rem;
+    font-size: 0.75rem;
+}
+
+/* Botão delete menor */
+
+/* Responsividade Geral */
 @media (max-width: 768px) {
     .main-container {
         padding-left: 0.5rem;
         padding-right: 0.5rem;
+        margin-top: 0.75rem;
     }
 
     .alert-container {
-        top: 65px;
-        left: 10px;
-        right: 10px;
-        min-width: auto;
-        max-width: none;
-        width: auto;
+        top: 60px;
     }
 
-    #summaryBalance {
-        font-size: 2.5rem;
+    #summaryBalanceMobile {
+        font-size: 1.8rem;
     }
 
-    /* Diminui saldo em telas menores */
+    #dashboardArea .btn-lg {
+        padding: 0.5rem 0.8rem;
+        font-size: 1rem;
+    }
 }
