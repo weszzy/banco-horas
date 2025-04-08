@@ -1,39 +1,41 @@
 // src/views/script.js
 /**
- * Sistema de Controle de Ponto v1.3.9
- * Corrige acesso a elementos dentro de modais e inicialização de instâncias.
+ * Sistema de Controle de Ponto v1.3.10 (Baseado no original de ~790 linhas)
+ * Código completo restaurado. Correções aplicadas para inicialização de modais e adição de listeners.
+ * Gerencia autenticação, registro de ponto, perfil e administração.
  */
 
 class PontoApp {
   constructor() {
-    // Cacheia elementos DOM principais que sempre existem
+    // Apenas cacheia referências DOM aqui. Instâncias e estado vêm depois.
     this._cacheDOMElements();
-    // Estado, instâncias de modal e listeners são inicializados depois
+    // _init() será chamado após verificação do Bootstrap no DOMContentLoaded
   }
 
-  // Cache apenas elementos que existem fora dos modais inicialmente
+  // Cacheia elementos DOM principais que sempre existem
   _cacheDOMElements() {
-    console.log("[CacheDOM v1.3.9] Caching DOM Elements...");
+    console.log("[CacheDOM v1.3.10] Caching DOM Elements...");
     this.ui = {
-      // Referências aos elementos dos Modais (para criar instância depois)
+      // Modals Elements (Refs)
       loginModalElement: document.getElementById('loginModal'),
       employeeFormModalElement: document.getElementById('employeeFormModal'),
       profileModalElement: document.getElementById('profileModal'),
-      // Instâncias Modal (inicializadas como null)
+      // Modal Instances (init later)
       loginModal: null, employeeFormModal: null, profileModal: null,
-      // Navbar & Áreas principais
-      authArea: document.getElementById('authArea'),
-      navLinksOffcanvas: document.getElementById('navLinksOffcanvas'), // Assumindo Offcanvas
+      // Navbar & Offcanvas
+      authArea: document.getElementById('authArea'), // Na navbar
+      mainOffcanvasElement: document.getElementById('mainOffcanvas'), // Elemento Offcanvas
+      mainOffcanvas: null, // Instância Offcanvas
+      navLinksOffcanvas: document.getElementById('navLinksOffcanvas'),
       navAdminLinksOffcanvas: document.getElementById('navAdminLinksOffcanvas'),
       navAdminSeparatorOffcanvas: document.getElementById('navAdminSeparatorOffcanvas'),
       navLogoutOffcanvas: document.getElementById('navLogoutOffcanvas'),
-      mainOffcanvasElement: document.getElementById('mainOffcanvas'), // Elemento Offcanvas
-      mainOffcanvas: null, // Instância Offcanvas
+      // Áreas Principais
       dashboardArea: document.getElementById('dashboardArea'),
       adminArea: document.getElementById('adminArea'),
       loginPrompt: document.getElementById('loginPrompt'),
       alertPlaceholder: document.getElementById('alertPlaceholder'),
-      // Dashboard
+      // Dashboard: Ponto & Status (Mobile IDs)
       employeeSelectMobile: $('#employeeSelectMobile'), // jQuery
       employeeSelectContainerMobile: document.getElementById('employeeSelectContainerMobile'),
       actionUserName: document.getElementById('actionUserName'),
@@ -49,13 +51,15 @@ class PontoApp {
       statusRetornoAlmocoMobile: document.getElementById('statusRetornoAlmocoMobile'),
       statusSaidaMobile: document.getElementById('statusSaidaMobile'),
       statusTotalHorasMobile: document.getElementById('statusTotalHorasMobile'),
+      // Dashboard: Resumo/Saldo (Mobile IDs)
       summaryLoadingMobile: document.getElementById('summaryLoadingMobile'),
-      summaryContentMobile: document.getElementById('summaryContent'), // Confere ID HTML
+      summaryContentMobile: document.getElementById('summaryContent'),
       summaryBalanceMobile: document.getElementById('summaryBalanceMobile'),
       linkMeuPerfilRapido: document.getElementById('linkMeuPerfilRapido'),
-      // Admin Area
+      // Admin: Tabela
       employeeListTableBody: document.getElementById('employeeListTableBody'),
       // Referências a elementos DENTRO dos modais são buscadas quando necessário
+      // Não mais cacheados aqui: loginForm, loginError, btnLoginSubmit, employeeForm, etc.
     };
     console.log("[CacheDOM] Main DOM Elements cached.");
   }
@@ -67,55 +71,32 @@ class PontoApp {
     if (this.ui.mainOffcanvasElement && typeof bootstrap !== 'undefined' && bootstrap.Offcanvas) {
       this.ui.mainOffcanvas = new bootstrap.Offcanvas(this.ui.mainOffcanvasElement);
     } else { console.warn("[InitComp] Offcanvas element or Bootstrap Offcanvas component not found.") }
+    // Cria instâncias de Modal aqui também, APÓS verificação Bootstrap
+    const canInitModals = typeof bootstrap !== 'undefined' && bootstrap.Modal;
+    if (!canInitModals) { console.error("FATAL: Bootstrap Modal component not found."); }
+    if (this.ui.loginModalElement && canInitModals) { this.ui.loginModal = new bootstrap.Modal(this.ui.loginModalElement); }
+    else { console.warn("[InitComp] Login Modal instance could not be created."); }
+    if (this.ui.employeeFormModalElement && canInitModals) { this.ui.employeeFormModal = new bootstrap.Modal(this.ui.employeeFormModalElement); }
+    else { console.warn("[InitComp] Employee Form Modal instance could not be created."); }
+    if (this.ui.profileModalElement && canInitModals) { this.ui.profileModal = new bootstrap.Modal(this.ui.profileModalElement); }
+    else { console.warn("[InitComp] Profile Modal instance could not be created."); }
 
     // Reseta estado
     this.state = { token: localStorage.getItem('authToken') || null, currentUser: JSON.parse(localStorage.getItem('currentUser')) || null, selectedEmployeeId: null, viewingEmployeeId: null, todayRecord: null, employeeList: [], currentView: 'login' };
     console.log("[InitComp] State and non-modal components initialized.");
   }
 
-  // Garante que uma instância de modal exista, criando-a se necessário
-  _ensureModalInstance(modalName) { // ex: 'loginModal', 'profileModal'
-    const element = this.ui[modalName + 'Element']; // Pega o elemento DOM cacheado
-    if (!element) {
-      console.error(`[Modal] Elemento DOM para ${modalName} não encontrado no cache.`);
-      return null;
-    }
-    if (!this.ui[modalName]) { // Se a instância ainda não foi criada
-      console.log(`[Modal] Criando instância Bootstrap para ${modalName}...`);
-      if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
-        this.ui[modalName] = new bootstrap.Modal(element);
-        // Adiciona listener para limpar erros quando o modal é fechado (exemplo para login)
-        if (modalName === 'loginModal' && this.ui.loginError) {
-          element.addEventListener('hidden.bs.modal', () => {
-            this.ui.loginError.style.display = 'none';
-            this.ui.loginForm?.reset(); // Limpa form ao fechar
-          });
-        }
-        // Adiciona listener para limpar form de funcionário ao fechar
-        if (modalName === 'employeeFormModal' && this.ui.employeeForm) {
-          element.addEventListener('hidden.bs.modal', () => {
-            this.ui.employeeForm.reset();
-            this.ui.employeeForm.classList.remove('was-validated');
-            if (this.ui.employeeFormError) this.ui.employeeFormError.style.display = 'none';
-          });
-        }
-
-      } else {
-        console.error(`[Modal] Bootstrap Modal component indisponível para criar ${modalName}.`);
-        return null;
-      }
-    }
-    return this.ui[modalName]; // Retorna a instância (existente ou recém-criada)
-  }
+  // Garante que uma instância de modal exista (usada internamente, não precisa mais)
+  // _ensureModalInstance(modalName) { /* ... REMOVIDO pois inicializamos no InitComp ... */ }
 
 
   _init() {
-    console.log("PontoApp v1.3.9 _init called...");
-    this._initializeComponents(); // Inicializa estado e Offcanvas
+    console.log("PontoApp v1.3.10 _init called..."); // Atualiza versão no log
+    this._initializeComponents(); // Inicializa estado, Offcanvas e Modais
     this._setupStaticEventListeners(); // Configura listeners estáticos (fora dos modais)
     this._initSelect2();
     this._updateView(); // Define visão inicial e adiciona listeners dinâmicos (navbar)
-    // Instâncias de Modal e listeners internos serão configurados sob demanda
+    this._setupAllModalEventListeners(); // Configura listeners internos dos modais uma vez
   }
 
   // Listeners para elementos estáticos fora dos modais
@@ -132,79 +113,134 @@ class PontoApp {
     if (this.ui.linkMeuPerfilRapido) { this.ui.linkMeuPerfilRapido.addEventListener('click', (e) => { e.preventDefault(); const tid = this.state.currentUser?.id; console.log("[Listeners] Link 'Meu Perfil Rápido' clicado. Target ID:", tid); if (tid) { this.showProfileModal(tid); } else { this.showAlert('info', 'Faça login.'); } }); } else { console.error("[Listeners] Static Error: linkMeuPerfilRapido not found"); }
     // Listener para o EVENTO 'show' do modal de formulário (para preparar o form)
     if (this.ui.employeeFormModalElement) { this.ui.employeeFormModalElement.addEventListener('show.bs.modal', (e) => { const btn = e.relatedTarget; const empId = btn?.dataset.employeeId; this.prepareEmployeeForm(empId ? parseInt(empId, 10) : null); }); } else { console.error("[Listeners] Static Error: employeeFormModalElement not found."); }
-    // Listener para botão de submit do FORMULÁRIO de login (não o botão em si)
-    // O listener do botão será adicionado dinamicamente quando o modal for aberto/criado
-    if (this.ui.loginForm) { this.ui.loginForm.addEventListener('submit', (e) => { e.preventDefault(); this.handleLogin(); }); } else { console.error("[Listeners] Static Error: loginForm not found."); }
-    // Listener para botão de submit do FORMULÁRIO de funcionário
-    if (this.ui.employeeForm) { this.ui.employeeForm.addEventListener('submit', (e) => { e.preventDefault(); this.handleSaveEmployeeForm(); }); } else { console.error("[Listeners] Static Error: employeeForm not found."); }
 
     console.log("[Listeners] Static event listeners set up completed.");
   }
 
-  // Configura listeners para elementos DENTRO de um modal específico
-  // Chamado geralmente quando o modal é aberto ou garantido existir
-  _setupModalEventListeners(modalName) {
-    console.log(`[Listeners] Setting up listeners for ${modalName}...`);
-    const modalInstance = this.ui[modalName]; // Pega instância já criada
-    const modalElement = this.ui[modalName + 'Element']; // Pega elemento DOM
+  // Configura listeners para elementos DENTRO de todos os modais (chamado uma vez no _init)
+  _setupAllModalEventListeners() {
+    console.log("[Listeners] Setting up ALL modal event listeners...");
 
-    if (!modalInstance || !modalElement) {
-      console.error(`[Listeners] Cannot setup listeners for ${modalName}. Instance or element missing.`);
-      return;
-    }
+    // --- Login Modal Listeners ---
+    const loginModalElement = this.ui.loginModalElement;
+    if (loginModalElement) {
+      const loginForm = loginModalElement.querySelector('#loginForm');
+      const btnSubmit = loginModalElement.querySelector('#btnLoginSubmit');
+      const loginError = loginModalElement.querySelector('#loginError'); // Guarda ref se precisar
 
-    if (modalName === 'loginModal') {
-      const btnSubmit = modalElement.querySelector('#btnLoginSubmit');
-      if (btnSubmit && !btnSubmit.listenerAttached) {
-        btnSubmit.addEventListener('click', () => this.handleLogin());
-        btnSubmit.listenerAttached = true; // Flag para evitar duplicar
-        console.log(`[Listeners] Listener attached to btnLoginSubmit in ${modalName}`);
-      } else if (!btnSubmit) { console.error(`[Listeners] btnLoginSubmit not found in ${modalName}`); }
-    }
-    else if (modalName === 'employeeFormModal') {
-      const btnSave = modalElement.querySelector('#btnSaveChangesEmployee');
-      if (btnSave && !btnSave.listenerAttached) {
-        btnSave.addEventListener('click', () => this.handleSaveEmployeeForm());
-        btnSave.listenerAttached = true;
-        console.log(`[Listeners] Listener attached to btnSaveChangesEmployee in ${modalName}`);
-      } else if (!btnSave) { console.error(`[Listeners] btnSaveChangesEmployee not found in ${modalName}`); }
-      // Adiciona listeners de validação em tempo real se necessário
-      modalElement.querySelectorAll('input, select').forEach(input => {
-        if (!input.listenerAttached) {
-          input.addEventListener('input', () => { if (this.ui.employeeForm?.classList.contains('was-validated')) { this._validateEmployeeForm(); } });
-          input.listenerAttached = true;
+      if (loginForm) {
+        if (!loginForm.listenerAttached) { // Evita duplicar listener
+          loginForm.addEventListener('submit', (e) => { e.preventDefault(); this.handleLogin(); });
+          loginForm.listenerAttached = true;
+          console.log("[Listeners] Submit listener attached to loginForm.");
         }
+      } else { console.error("[Listeners] loginForm not found inside modal."); }
+
+      if (btnSubmit) {
+        if (!btnSubmit.listenerAttached) {
+          btnSubmit.addEventListener('click', () => this.handleLogin());
+          btnSubmit.listenerAttached = true;
+          console.log("[Listeners] Click listener attached to btnLoginSubmit.");
+        }
+      } else { console.error("[Listeners] btnLoginSubmit not found inside modal."); }
+
+      // Limpar erro/form ao fechar
+      loginModalElement.addEventListener('hidden.bs.modal', () => {
+        if (loginError) loginError.style.display = 'none';
+        loginForm?.reset();
       });
-      console.log(`[Listeners] Input listeners attached in ${modalName}`);
-    }
-    else if (modalName === 'profileModal') {
-      const btnEdit = modalElement.querySelector('#btnEditProfile');
-      const btnToggle = modalElement.querySelector('#btnToggleActiveStatus');
-      if (btnEdit && !btnEdit.listenerAttached) { btnEdit.addEventListener('click', () => this.editProfileFromModal()); btnEdit.listenerAttached = true; console.log(`[Listeners] Listener attached to btnEditProfile in ${modalName}`); }
-      else if (!btnEdit) { console.error(`[Listeners] btnEditProfile not found in ${modalName}`); }
-      if (btnToggle && !btnToggle.listenerAttached) { btnToggle.addEventListener('click', () => this.toggleActiveStatusFromModal()); btnToggle.listenerAttached = true; console.log(`[Listeners] Listener attached to btnToggleActiveStatus in ${modalName}`); }
-      else if (!btnToggle) { console.error(`[Listeners] btnToggleActiveStatus not found in ${modalName}`); }
-      // Listeners para botões na tabela de histórico são adicionados em renderProfileModalContent
-    }
+    } else { console.error("[Listeners] loginModalElement not found for modal listeners."); }
+
+    // --- Employee Form Modal Listeners ---
+    const employeeModalElement = this.ui.employeeFormModalElement;
+    if (employeeModalElement) {
+      const employeeForm = employeeModalElement.querySelector('#employeeForm');
+      const btnSave = employeeModalElement.querySelector('#btnSaveChangesEmployee');
+      const formError = employeeModalElement.querySelector('#employeeFormError'); // Guarda ref
+
+      if (employeeForm) {
+        if (!employeeForm.listenerAttached) {
+          employeeForm.addEventListener('submit', (e) => { e.preventDefault(); this.handleSaveEmployeeForm(); });
+          employeeForm.listenerAttached = true;
+          console.log("[Listeners] Submit listener attached to employeeForm.");
+        }
+        // Listeners de input para validação
+        employeeModalElement.querySelectorAll('input, select').forEach(input => {
+          if (!input.listenerAttached) {
+            input.addEventListener('input', () => { if (employeeForm.classList.contains('was-validated')) { this._validateEmployeeForm(); } });
+            input.listenerAttached = true;
+          }
+        });
+      } else { console.error("[Listeners] employeeForm not found inside modal."); }
+
+      if (btnSave) {
+        if (!btnSave.listenerAttached) {
+          btnSave.addEventListener('click', () => this.handleSaveEmployeeForm());
+          btnSave.listenerAttached = true;
+          console.log("[Listeners] Click listener attached to btnSaveChangesEmployee.");
+        }
+      } else { console.error("[Listeners] btnSaveChangesEmployee not found inside modal."); }
+
+      // Limpar form/erro ao fechar
+      employeeModalElement.addEventListener('hidden.bs.modal', () => {
+        employeeForm?.reset();
+        employeeForm?.classList.remove('was-validated');
+        if (formError) formError.style.display = 'none';
+      });
+
+    } else { console.error("[Listeners] employeeFormModalElement not found for modal listeners."); }
+
+    // --- Profile Modal Listeners ---
+    const profileModalElement = this.ui.profileModalElement;
+    if (profileModalElement) {
+      const btnEdit = profileModalElement.querySelector('#btnEditProfile');
+      const btnToggle = profileModalElement.querySelector('#btnToggleActiveStatus');
+
+      if (btnEdit) {
+        if (!btnEdit.listenerAttached) {
+          btnEdit.addEventListener('click', () => this.editProfileFromModal());
+          btnEdit.listenerAttached = true;
+          console.log("[Listeners] Click listener attached to btnEditProfile.");
+        }
+      } else { console.error("[Listeners] btnEditProfile not found inside modal."); }
+
+      if (btnToggle) {
+        if (!btnToggle.listenerAttached) {
+          btnToggle.addEventListener('click', () => this.toggleActiveStatusFromModal());
+          btnToggle.listenerAttached = true;
+          console.log("[Listeners] Click listener attached to btnToggleActiveStatus.");
+        }
+      } else { console.error("[Listeners] btnToggleActiveStatus not found inside modal."); }
+      // Listeners para botões delete na tabela são adicionados em renderProfileModalContent
+    } else { console.error("[Listeners] profileModalElement not found for modal listeners."); }
+
+    console.log("[Listeners] All modal event listeners set up.");
   }
 
   // Adiciona listeners para elementos que são criados/exibidos dinamicamente NA NAVBAR/OFFCANVAS
   _setupDynamicEventListeners() {
     console.log("[Listeners] Setting up dynamic event listeners for Offcanvas/Navbar...");
-    // Botão Logout (Offcanvas)
-    const btnLogout = document.getElementById('btnLogoutOffcanvas');
+    const btnLogout = document.getElementById('btnLogoutOffcanvas'); // No offcanvas
     if (btnLogout) { if (!btnLogout.onclick) { btnLogout.onclick = (e) => { e.preventDefault(); this.ui.mainOffcanvas?.hide(); this.handleLogout(); }; console.log("[Listeners] Dynamic Listener: Logout (Offcanvas) attached."); } }
     else { if (this.state.currentUser) console.warn("[Listeners] Dynamic Warning: btnLogoutOffcanvas not found."); }
-    // Links Offcanvas
     const linkMeuPerfil = document.getElementById('linkMeuPerfilOffcanvas');
     if (linkMeuPerfil) { if (!linkMeuPerfil.onclick) { linkMeuPerfil.onclick = (e) => { e.preventDefault(); this.ui.mainOffcanvas?.hide(); if (this.state.currentUser?.id) { this.showProfileModal(this.state.currentUser.id); } else { this.showAlert('danger', 'Erro: Usuário não logado.'); } }; console.log("[Listeners] Dynamic Listener: Meu Perfil (Offcanvas) attached."); } }
     else { if (this.ui.navLinksOffcanvas?.style.display !== 'none') console.warn("[Listeners] Dynamic Warning: linkMeuPerfilOffcanvas not found."); }
     const linkGerenciar = document.getElementById('linkGerenciarFuncionariosOffcanvas');
     if (linkGerenciar) { if (!linkGerenciar.onclick) { linkGerenciar.onclick = (e) => { e.preventDefault(); this.ui.mainOffcanvas?.hide(); this.setView('admin'); }; console.log("[Listeners] Dynamic Listener: Gerenciar (Offcanvas) attached."); } }
     else { if (this.ui.navAdminLinksOffcanvas?.style.display !== 'none') console.warn("[Listeners] Dynamic Warning: linkGerenciarFuncionariosOffcanvas not found."); }
-    // Link Novo Funcionário (Offcanvas - Verifica apenas)
     const linkNovoFunc = document.getElementById('linkNovoFuncionarioOffcanvas');
     if (!linkNovoFunc && this.ui.navAdminLinksOffcanvas?.style.display !== 'none') { console.warn("[Listeners] Dynamic Warning: linkNovoFuncionarioOffcanvas not found."); }
+    // Botão de Login na Navbar (quando deslogado)
+    if (!this.state.token) {
+      const btnLoginTriggerNavbar = document.getElementById('btnLoginTrigger');
+      if (btnLoginTriggerNavbar) {
+        if (!btnLoginTriggerNavbar.onclick) {
+          btnLoginTriggerNavbar.onclick = () => { console.log("[Listeners] Botão Login (Navbar) clicado."); const modal = this._ensureModalInstance('loginModal'); if (modal) modal.show(); };
+          console.log("[Listeners] Dynamic Listener: Login (Navbar) attached.");
+        }
+      } else { console.warn("[Listeners] Dynamic Warning: btnLoginTrigger (Navbar) not found."); }
+    }
     console.log("[Listeners] Dynamic event listeners for Navbar/Offcanvas set up completed.");
   }
 
