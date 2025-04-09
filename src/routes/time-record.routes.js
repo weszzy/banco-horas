@@ -10,6 +10,12 @@ const { authenticate, authorize } = require('../middlewares/auth.middleware');
 // Aplicar autenticação básica a todas as rotas abaixo
 router.use(authenticate);
 
+// ROTA DE TESTE SIMPLES
+router.get('/ping', (req, res) => {
+    console.log('>>> ROTA /api/time-records/ping ACESSADA <<<');
+    res.status(200).json({ message: 'pong from time-records' });
+});
+
 // --- Rotas do Funcionário ---
 router.post('/check-in', timeRecordController.checkIn);
 router.post('/lunch-start', timeRecordController.startLunch);
