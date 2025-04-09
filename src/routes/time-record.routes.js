@@ -2,13 +2,14 @@
 const express = require('express');
 const router = express.Router();
 const timeRecordController = require('../controllers/time-record.controller');
-// Importa authorize também
 const { authenticate, authorize } = require('../middlewares/auth.middleware');
 
 // === ROTAS PARA /api/time-records ===
 
-// Aplicar autenticação básica a todas as rotas abaixo
+// Aplica autenticação básica a todas as rotas abaixo
 router.use(authenticate);
+
+// --- Rotas Mais Específicas PRIMEIRO ---
 
 // ROTA DE TESTE SIMPLES
 router.get('/ping', (req, res) => {
@@ -16,27 +17,36 @@ router.get('/ping', (req, res) => {
     res.status(200).json({ message: 'pong from time-records' });
 });
 
-// --- Rotas do Funcionário ---
+// Rota para criar registro manual (Admin Only)
+router.post('/manual',
+    authorize(['admin']),
+    timeRecordController.createManualRecord
+);
+
+// Rota para obter o registro de HOJE do usuário logado
+router.get('/today', timeRecordController.getTodaysRecord);
+
+
+// --- Rotas de Ponto do Funcionário ---
 router.post('/check-in', timeRecordController.checkIn);
 router.post('/lunch-start', timeRecordController.startLunch);
 router.post('/lunch-end', timeRecordController.endLunch);
 router.post('/check-out', timeRecordController.checkOut);
 
-// --- ROTA ADICIONADA ---
-// Obter o registro de ponto de HOJE para o usuário logado
-router.get('/today', timeRecordController.getTodaysRecord);
-// ----------------------
 
-// Histórico simples e com saldo são acessíveis por funcionário (para si) e admin
+// --- Rotas com Parâmetros (Mais Genéricas) DEPOIS ---
+
+// Rota para obter histórico SIMPLES de um funcionário
 router.get('/employee/:employeeId', timeRecordController.getHistory);
+
+// Rota para obter histórico COM SALDO de um funcionário
 router.get('/employee/:employeeId/balance-history', timeRecordController.getBalanceHistory);
 
-// --- Rotas Administrativas ---
-
-// Remover um registro de ponto específico (Admin Only)
-router.delete('/:recordId(\\d+)', authorize(['admin']), timeRecordController.deleteRecord);
-
-// Criar um registro de ponto manualmente (Admin Only)
-router.post('/manual', authorize(['admin']), timeRecordController.createManualRecord);
+// Rota para remover um registro específico (Admin Only)
+// Nota: :recordId será um número, não conflita com '/today' ou '/manual'
+router.delete('/:recordId(\\d+)',
+    authorize(['admin']),
+    timeRecordController.deleteRecord
+);
 
 module.exports = router; // Exporta o router configurado
