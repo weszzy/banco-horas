@@ -1,7 +1,7 @@
 // src/views/script.js
 /**
- * Sistema de Controle de Ponto v1.3.10
- * Abre modais programaticamente via JS e corrige listeners.
+ * Sistema de Controle de Ponto v1.3.11
+ * Limpa sintaxe de listeners e reforça abertura programática de modais.
  */
 
 class PontoApp {
@@ -66,27 +66,21 @@ class PontoApp {
     console.log("[InitComp] Initializing state and non-modal components...");
     const canInitModals = typeof bootstrap !== 'undefined' && bootstrap.Modal;
     const canInitOffcanvas = typeof bootstrap !== 'undefined' && bootstrap.Offcanvas;
-
-    if (this.ui.mainOffcanvasElement && canInitOffcanvas) { this.ui.mainOffcanvas = new bootstrap.Offcanvas(this.ui.mainOffcanvasElement); }
-    else { console.warn("[InitComp] Offcanvas init failed."); }
-    if (this.ui.loginModalElement && canInitModals) { this.ui.loginModal = new bootstrap.Modal(this.ui.loginModalElement); }
-    else { console.warn("[InitComp] Login Modal init failed."); }
-    if (this.ui.employeeFormModalElement && canInitModals) { this.ui.employeeFormModal = new bootstrap.Modal(this.ui.employeeFormModalElement); }
-    else { console.warn("[InitComp] Employee Form Modal init failed."); }
-    if (this.ui.profileModalElement && canInitModals) { this.ui.profileModal = new bootstrap.Modal(this.ui.profileModalElement); }
-    else { console.warn("[InitComp] Profile Modal init failed."); }
-
+    if (this.ui.mainOffcanvasElement && canInitOffcanvas) { this.ui.mainOffcanvas = new bootstrap.Offcanvas(this.ui.mainOffcanvasElement); } else { console.warn("[InitComp] Offcanvas init failed."); }
+    if (this.ui.loginModalElement && canInitModals) { this.ui.loginModal = new bootstrap.Modal(this.ui.loginModalElement); } else { console.warn("[InitComp] Login Modal init failed."); }
+    if (this.ui.employeeFormModalElement && canInitModals) { this.ui.employeeFormModal = new bootstrap.Modal(this.ui.employeeFormModalElement); } else { console.warn("[InitComp] Employee Form Modal init failed."); }
+    if (this.ui.profileModalElement && canInitModals) { this.ui.profileModal = new bootstrap.Modal(this.ui.profileModalElement); } else { console.warn("[InitComp] Profile Modal init failed."); }
     this.state = { token: localStorage.getItem('authToken') || null, currentUser: JSON.parse(localStorage.getItem('currentUser')) || null, selectedEmployeeId: null, viewingEmployeeId: null, todayRecord: null, employeeList: [], currentView: 'login' };
     console.log("[InitComp] Components initialized.");
   }
 
   _init() {
-    console.log("PontoApp v1.3.11 _init called...");
+    console.log("PontoApp v1.3.12 _init called...");
     this._initializeComponents();
     this._setupStaticEventListeners();
     this._initSelect2();
-    this._updateView(); // Define visão inicial e adiciona listeners dinâmicos (navbar/offcanvas)
-    // Listeners internos dos modais serão adicionados quando o modal for aberto
+    this._updateView();
+    this._setupAllModalEventListeners();
   }
 
   // Listeners para elementos estáticos fora dos modais
@@ -160,6 +154,42 @@ class PontoApp {
     }
     console.log(`[Listeners] Modal listeners for ${modalName} set up.`);
   }
+
+
+  _setupDynamicEventListeners() {
+    console.log("[Listeners] Setting up dynamic event listeners for Offcanvas/Navbar...");
+    // Botão Logout (Offcanvas)
+    const btnLogout = document.getElementById('btnLogoutOffcanvas');
+    if (btnLogout) { if (!btnLogout.onclick) { btnLogout.onclick = (e) => { e.preventDefault(); this.ui.mainOffcanvas?.hide(); this.handleLogout(); }; console.log("[Listeners] Dynamic Listener: Logout (Offcanvas) attached."); } }
+    else { if (this.state.currentUser) console.warn("[Listeners] Dynamic Warning: btnLogoutOffcanvas not found."); }
+    // Links Offcanvas
+    const linkMeuPerfil = document.getElementById('linkMeuPerfilOffcanvas');
+    if (linkMeuPerfil) { if (!linkMeuPerfil.onclick) { linkMeuPerfil.onclick = (e) => { e.preventDefault(); this.ui.mainOffcanvas?.hide(); if (this.state.currentUser?.id) { this.showProfileModal(this.state.currentUser.id); } else { this.showAlert('danger', 'Erro: Usuário não logado.'); } }; console.log("[Listeners] Dynamic Listener: Meu Perfil (Offcanvas) attached."); } }
+    else { if (this.ui.navLinksOffcanvas?.style.display !== 'none') console.warn("[Listeners] Dynamic Warning: linkMeuPerfilOffcanvas not found."); }
+    const linkGerenciar = document.getElementById('linkGerenciarFuncionariosOffcanvas');
+    if (linkGerenciar) { if (!linkGerenciar.onclick) { linkGerenciar.onclick = (e) => { e.preventDefault(); this.ui.mainOffcanvas?.hide(); this.setView('admin'); }; console.log("[Listeners] Dynamic Listener: Gerenciar (Offcanvas) attached."); } }
+    else { if (this.ui.navAdminLinksOffcanvas?.style.display !== 'none') console.warn("[Listeners] Dynamic Warning: linkGerenciarFuncionariosOffcanvas not found."); }
+    // Link Novo Funcionário (Offcanvas)
+    const linkNovoFunc = document.getElementById('linkNovoFuncionarioOffcanvas');
+    if (linkNovoFunc) {
+      if (!linkNovoFunc.onclick) {
+        linkNovoFunc.onclick = (e) => { e.preventDefault(); console.log("[Listeners] Link Novo Funcionário (Offcanvas) clicado."); if (this.ui.mainOffcanvas) this.ui.mainOffcanvas.hide(); this.prepareEmployeeForm(null); const modal = this.ui.employeeFormModal; if (modal) modal.show(); else this.showAlert('danger', 'Erro ao abrir formulário.'); };
+        console.log("[Listeners] Dynamic Listener: Novo Funcionário (Offcanvas) attached.");
+      }
+    } else { if (this.ui.navAdminLinksOffcanvas?.style.display !== 'none') console.warn("[Listeners] Dynamic Warning: linkNovoFuncionarioOffcanvas not found."); }
+    // Botão de Login na Navbar (quando deslogado)
+    if (!this.state.token) {
+      const btnLoginTriggerNavbar = document.getElementById('btnLoginTrigger');
+      if (btnLoginTriggerNavbar) {
+        if (!btnLoginTriggerNavbar.onclick) {
+          btnLoginTriggerNavbar.onclick = () => { console.log("[Listeners] Botão Login (Navbar) clicado."); const modal = this.ui.loginModal; if (modal) modal.show(); else this.showAlert('danger', 'Erro ao abrir login.'); };
+          console.log("[Listeners] Dynamic Listener: Login (Navbar) attached.");
+        }
+      } else { console.warn("[Listeners] Dynamic Warning: btnLoginTrigger (Navbar) not found."); }
+    }
+    console.log("[Listeners] Dynamic event listeners for Navbar/Offcanvas set up completed.");
+  }
+
 
   _initSelect2() {
     const targetSelect = this.ui.employeeSelectMobile;
