@@ -86,13 +86,38 @@ class PontoApp {
     console.log("[InitComp] State and non-modal components initialized.");
   }
 
-  // Método chamado após a instância ser criada e o Bootstrap verificado
+  _ensureModalInstance(modalName) {
+    const element = this.ui[modalName + 'Element'];
+    if (!element) { console.error(`[Modal] Elemento DOM para ${modalName} não encontrado.`); return null; }
+    if (!this.ui[modalName]) {
+      console.log(`[Modal] Criando instância Bootstrap para ${modalName}...`);
+      if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+        this.ui[modalName] = new bootstrap.Modal(element);
+        // Adiciona listeners genéricos de hidden.bs.modal aqui
+        element.addEventListener('hidden.bs.modal', () => {
+          console.log(`[Modal] ${modalName} fechado.`);
+          // Limpeza específica pode ser feita aqui ou no handler que abre/fecha
+          if (modalName === 'loginModal' && this.ui.loginModalElement) {
+            this.ui.loginModalElement.querySelector('#loginError')?.style.display = 'none';
+            this.ui.loginModalElement.querySelector('#loginForm')?.reset();
+          }
+          if (modalName === 'employeeFormModal' && this.ui.employeeFormModalElement) {
+            this.ui.employeeFormModalElement.querySelector('#employeeForm')?.reset();
+            this.ui.employeeFormModalElement.querySelector('#employeeForm')?.classList.remove('was-validated');
+            this.ui.employeeFormModalElement.querySelector('#employeeFormError')?.style.display = 'none';
+          }
+        });
+      } else { console.error(`[Modal] Bootstrap indisponível para criar ${modalName}.`); return null; }
+    }
+    return this.ui[modalName];
+  }
+
   _init() {
-    console.log("PontoApp v1.3.10 _init called...");
-    this._initializeComponents(); // Inicializa estado, Offcanvas e Modais
-    this._setupStaticEventListeners(); // Configura listeners estáticos (fora dos modais)
+    console.log("PontoApp v1.3.11 _init called...");
+    this._initializeComponents();
+    this._setupStaticEventListeners();
     this._initSelect2();
-    this._updateView(); // Define visão inicial e adiciona listeners dinâmicos (navbar)
+    this._updateView();
     this._setupAllModalEventListeners(); // Configura listeners internos dos modais uma vez
   }
 
@@ -139,36 +164,32 @@ class PontoApp {
     if (loginModalElement) {
       const loginForm = loginModalElement.querySelector('#loginForm');
       const btnSubmit = loginModalElement.querySelector('#btnLoginSubmit');
-      const loginError = loginModalElement.querySelector('#loginError'); // Guarda ref
-      if (loginForm && !loginForm.listenerAttached) { loginForm.addEventListener('submit', (e) => { e.preventDefault(); this.handleLogin(); }); loginForm.listenerAttached = true; console.log("[Listeners] Submit listener attached to loginForm."); }
-      else if (!loginForm) { console.error("[Listeners] loginForm not found inside modal."); }
-      if (btnSubmit && !btnSubmit.listenerAttached) { btnSubmit.addEventListener('click', () => this.handleLogin()); btnSubmit.listenerAttached = true; console.log("[Listeners] Click listener attached to btnLoginSubmit."); }
-      else if (!btnSubmit) { console.error("[Listeners] btnLoginSubmit not found inside modal."); }
-      loginModalElement.addEventListener('hidden.bs.modal', () => { if (loginError) loginError.style.display = 'none'; loginForm?.reset(); });
-    } else { console.error("[Listeners] loginModalElement not found for modal listeners."); }
+      if (loginForm && !loginForm.listenerAttached) { loginForm.addEventListener('submit', (e) => { e.preventDefault(); this.handleLogin(); }); loginForm.listenerAttached = true; }
+      else if (!loginForm) { console.error("[Listeners] loginForm not found in loginModal."); }
+      if (btnSubmit && !btnSubmit.listenerAttached) { btnSubmit.addEventListener('click', () => this.handleLogin()); btnSubmit.listenerAttached = true; }
+      else if (!btnSubmit) { console.error("[Listeners] btnLoginSubmit not found in loginModal."); }
+    } else { console.error("[Listeners] loginModalElement not found."); }
     // --- Employee Form Modal Listeners ---
     const employeeModalElement = this.ui.employeeFormModalElement;
     if (employeeModalElement) {
       const employeeForm = employeeModalElement.querySelector('#employeeForm');
       const btnSave = employeeModalElement.querySelector('#btnSaveChangesEmployee');
-      const formError = employeeModalElement.querySelector('#employeeFormError');
-      if (employeeForm && !employeeForm.listenerAttached) { employeeForm.addEventListener('submit', (e) => { e.preventDefault(); this.handleSaveEmployeeForm(); }); employeeForm.listenerAttached = true; console.log("[Listeners] Submit listener attached to employeeForm."); }
-      else if (!employeeForm) { console.error("[Listeners] employeeForm not found inside modal."); }
-      if (btnSave && !btnSave.listenerAttached) { btnSave.addEventListener('click', () => this.handleSaveEmployeeForm()); btnSave.listenerAttached = true; console.log("[Listeners] Click listener attached to btnSaveChangesEmployee."); }
-      else if (!btnSave) { console.error("[Listeners] btnSaveChangesEmployee not found inside modal."); }
+      if (employeeForm && !employeeForm.listenerAttached) { employeeForm.addEventListener('submit', (e) => { e.preventDefault(); this.handleSaveEmployeeForm(); }); employeeForm.listenerAttached = true; }
+      else if (!employeeForm) { console.error("[Listeners] employeeForm not found in employeeModal."); }
+      if (btnSave && !btnSave.listenerAttached) { btnSave.addEventListener('click', () => this.handleSaveEmployeeForm()); btnSave.listenerAttached = true; }
+      else if (!btnSave) { console.error("[Listeners] btnSaveChangesEmployee not found in employeeModal."); }
       employeeModalElement.querySelectorAll('input, select').forEach(input => { if (!input.listenerAttached) { input.addEventListener('input', () => { if (employeeForm?.classList.contains('was-validated')) { this._validateEmployeeForm(); } }); input.listenerAttached = true; } });
-      employeeModalElement.addEventListener('hidden.bs.modal', () => { employeeForm?.reset(); employeeForm?.classList.remove('was-validated'); if (formError) formError.style.display = 'none'; });
-    } else { console.error("[Listeners] employeeFormModalElement not found for modal listeners."); }
+    } else { console.error("[Listeners] employeeFormModalElement not found."); }
     // --- Profile Modal Listeners ---
     const profileModalElement = this.ui.profileModalElement;
     if (profileModalElement) {
       const btnEdit = profileModalElement.querySelector('#btnEditProfile');
       const btnToggle = profileModalElement.querySelector('#btnToggleActiveStatus');
-      if (btnEdit && !btnEdit.listenerAttached) { btnEdit.addEventListener('click', () => this.editProfileFromModal()); btnEdit.listenerAttached = true; console.log("[Listeners] Click listener attached to btnEditProfile."); }
-      else if (!btnEdit) { console.error("[Listeners] btnEditProfile not found inside modal."); }
-      if (btnToggle && !btnToggle.listenerAttached) { btnToggle.addEventListener('click', () => this.toggleActiveStatusFromModal()); btnToggle.listenerAttached = true; console.log("[Listeners] Click listener attached to btnToggleActiveStatus."); }
-      else if (!btnToggle) { console.error("[Listeners] btnToggleActiveStatus not found inside modal."); }
-    } else { console.error("[Listeners] profileModalElement not found for modal listeners."); }
+      if (btnEdit && !btnEdit.listenerAttached) { btnEdit.addEventListener('click', () => this.editProfileFromModal()); btnEdit.listenerAttached = true; }
+      else if (!btnEdit) { console.error("[Listeners] btnEditProfile not found in profileModal."); }
+      if (btnToggle && !btnToggle.listenerAttached) { btnToggle.addEventListener('click', () => this.toggleActiveStatusFromModal()); btnToggle.listenerAttached = true; }
+      else if (!btnToggle) { console.error("[Listeners] btnToggleActiveStatus not found in profileModal."); }
+    } else { console.error("[Listeners] profileModalElement not found."); }
     console.log("[Listeners] All modal event listeners set up.");
   }
 
@@ -188,7 +209,7 @@ class PontoApp {
     const linkNovoFunc = document.getElementById('linkNovoFuncionarioOffcanvas');
     if (linkNovoFunc) {
       if (!linkNovoFunc.onclick) {
-        linkNovoFunc.onclick = (e) => { e.preventDefault(); console.log("[Listeners] Link Novo Funcionário (Offcanvas) clicado."); if (this.ui.mainOffcanvas) this.ui.mainOffcanvas.hide(); this.prepareEmployeeForm(null); const modal = this.ui.employeeFormModal || this._ensureModalInstance('employeeFormModal'); if (modal) modal.show(); else this.showAlert('danger', 'Erro ao abrir formulário.'); };
+        linkNovoFunc.onclick = (e) => { e.preventDefault(); console.log("[Listeners] Link Novo Funcionário (Offcanvas) clicado."); if (this.ui.mainOffcanvas) this.ui.mainOffcanvas.hide(); this.prepareEmployeeForm(null); const modal = this.ui.employeeFormModal; if (modal) modal.show(); else this.showAlert('danger', 'Erro ao abrir formulário.'); }; // Usa instância cacheada
         console.log("[Listeners] Dynamic Listener: Novo Funcionário (Offcanvas) attached.");
       }
     } else { if (this.ui.navAdminLinksOffcanvas?.style.display !== 'none') console.warn("[Listeners] Dynamic Warning: linkNovoFuncionarioOffcanvas not found."); }
@@ -197,7 +218,7 @@ class PontoApp {
       const btnLoginTriggerNavbar = document.getElementById('btnLoginTrigger');
       if (btnLoginTriggerNavbar) {
         if (!btnLoginTriggerNavbar.onclick) {
-          btnLoginTriggerNavbar.onclick = () => { console.log("[Listeners] Botão Login (Navbar) clicado."); const modal = this.ui.loginModal || this._ensureModalInstance('loginModal'); if (modal) modal.show(); else this.showAlert('danger', 'Erro ao abrir login.'); };
+          btnLoginTriggerNavbar.onclick = () => { console.log("[Listeners] Botão Login (Navbar) clicado."); const modal = this.ui.loginModal; if (modal) modal.show(); else this.showAlert('danger', 'Erro ao abrir login.'); }; // Usa instância cacheada
           console.log("[Listeners] Dynamic Listener: Login (Navbar) attached.");
         }
       } else { console.warn("[Listeners] Dynamic Warning: btnLoginTrigger (Navbar) not found."); }
@@ -213,20 +234,26 @@ class PontoApp {
 
   async handleLogin() {
     console.log("Handling login...");
-    const loginModal = this.ui.loginModal || this._ensureModalInstance('loginModal'); // Garante instância
+    const loginModal = this.ui.loginModal; // Pega instância já criada
     if (!loginModal) { console.error("Login Modal not initialized."); return; }
+
+    // Busca elementos DENTRO do modal
     const loginForm = this.ui.loginModalElement?.querySelector('#loginForm');
     const btnSubmit = this.ui.loginModalElement?.querySelector('#btnLoginSubmit');
     const loginError = this.ui.loginModalElement?.querySelector('#loginError');
+
     if (!loginForm || !btnSubmit || !loginError) { console.error("Elementos internos do modal de login não encontrados."); return; }
-    this._setupModalEventListeners('loginModal'); // Garante listeners internos
+
+    // _setupAllModalEventListeners já deve ter adicionado o listener ao btnSubmit e form
+
     const email = loginForm.email.value; const password = loginForm.password.value; loginError.style.display = 'none';
     if (!email || !password) { loginError.textContent = 'E-mail e senha obrigatórios.'; loginError.style.display = 'block'; return; }
     btnSubmit.disabled = true; btnSubmit.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Entrando...';
     try {
       const response = await fetch('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) }); if (!response) throw new Error("Falha na requisição."); const result = await response.json(); if (!response.ok || !result.success) throw new Error(result.message || `Erro ${response.status}`);
       this.state.token = result.data.token; this.state.currentUser = result.data.user; localStorage.setItem('authToken', this.state.token); localStorage.setItem('currentUser', JSON.stringify(this.state.currentUser)); console.log("Login successful.");
-      loginModal.hide(); this._updateView();
+      loginModal.hide(); // Usa a instância garantida
+      this._updateView();
     } catch (error) { console.error("Login failed:", error); loginError.textContent = `Falha: ${error.message}`; loginError.style.display = 'block'; }
     finally { btnSubmit.disabled = false; btnSubmit.innerHTML = 'Entrar'; }
   }
@@ -327,13 +354,18 @@ class PontoApp {
   }
 
   async showProfileModal(employeeId) {
-    console.log(`[ProfileModal] Attempting show for ID: ${employeeId}`); if (!employeeId) { console.warn("showProfileModal: employeeId is missing."); return; }
-    const profileModalInstance = this.ui.profileModal || this._ensureModalInstance('profileModal'); // Garante/Cria instância
+    console.log(`[ProfileModal] Attempting show for ID: ${employeeId}`); if (!employeeId) { console.warn("showProfileModal: employeeId missing."); return; }
+    const profileModalInstance = this.ui.profileModal; // Pega instância já criada
     if (!profileModalInstance) { console.error("Profile Modal could not be initialized."); this.showAlert('danger', 'Erro perfil.'); return; }
-    this.state.viewingEmployeeId = employeeId; if (this.ui.profileModalLabel) this.ui.profileModalLabel.textContent = "Carregando..."; if (this.ui.profileModalBody) this.ui.profileModalBody.innerHTML = `<div class="text-center p-5"><span class="spinner-border"></span></div>`; if (this.ui.profileAdminActions) this.ui.profileAdminActions.style.display = 'none';
-    this._setupModalEventListeners('profileModal'); // Garante listeners internos
+    this.state.viewingEmployeeId = employeeId;
+    if (this.ui.profileModalLabel) this.ui.profileModalLabel.textContent = "Carregando...";
+    if (this.ui.profileModalBody) this.ui.profileModalBody.innerHTML = `<div class="text-center p-5"><span class="spinner-border"></span></div>`;
+    if (this.ui.profileAdminActions) this.ui.profileAdminActions.style.display = 'none';
+    // Garante listeners internos
+    this._setupAllModalEventListeners(); // Chama para garantir, mas deveria ter sido chamado no init
+
     console.log("[ProfileModal] Calling .show()"); try { profileModalInstance.show(); } catch (e) { console.error("Error calling .show():", e); this.showAlert('danger', 'Erro abrir perfil.'); return; }
-    try {
+    try { // Fetch dos dados
       const empResponse = await this.fetchWithAuth(`/api/employees/${employeeId}`); if (!empResponse) return; const empResult = await empResponse.json(); if (!empResponse.ok || !empResult.success) throw new Error(`Erro Perfil: ${empResult.message || empResponse.statusText}`); const employee = empResult.data; if (!employee) throw new Error("Dados funcionário API vazios.");
       const endDate = new Date(); const startDate = new Date(); startDate.setDate(endDate.getDate() - 7); const histUrl = `/api/time-records/employee/${employeeId}/balance-history?startDate=${this.formatDateISO(startDate)}&endDate=${this.formatDateISO(endDate)}`; const histResponse = await this.fetchWithAuth(histUrl); let history = []; if (histResponse) { const histResult = await histResponse.json(); if (histResponse.ok && histResult.success) { history = histResult.data; } else { console.warn(`Falha histórico saldo: ${histResult?.message}`); } }
       this.renderProfileModalContent(employee, history);
@@ -359,8 +391,8 @@ class PontoApp {
 
   editProfileFromModal() {
     if (!this.state.viewingEmployeeId) return;
-    const profileModal = this.ui.profileModal || this._ensureModalInstance('profileModal'); // Garante instância
-    const employeeFormModal = this.ui.employeeFormModal || this._ensureModalInstance('employeeFormModal'); // Garante instância
+    const profileModal = this.ui.profileModal; // Pega instância
+    const employeeFormModal = this.ui.employeeFormModal; // Pega instância
     if (!profileModal || !employeeFormModal) { console.error("Modal instances missing."); this.showAlert('danger', 'Erro ao editar.'); return; }
     profileModal.hide(); const editButton = document.createElement('button'); editButton.dataset.employeeId = this.state.viewingEmployeeId;
     setTimeout(() => { employeeFormModal.show(editButton); }, 200);
@@ -413,13 +445,16 @@ class PontoApp {
   }
 
   prepareEmployeeForm(employeeId = null) {
-    // Garante que modal de formulário exista e adiciona listeners internos
+    const employeeFormModal = this.ui.employeeFormModal; // Pega instância
+    if (!employeeFormModal) { console.error("Modal form func. não init."); return; }
     this._ensureModalInstance('employeeFormModal');
     this._setupModalEventListeners('employeeFormModal');
     // Lógica original de preparar o formulário
     if (!this.ui.employeeForm || !this.ui.employeeFormModalLabel || !this.ui.btnSaveChangesEmployee || !this.ui.passwordFieldContainer || !this.ui.employeePassword || !this.ui.passwordHelp || !this.ui.employeeEmail || !this.ui.employeeFormError) { console.error("Elementos form func. não encontrados."); return; }
     this.ui.employeeForm.reset(); this.ui.employeeForm.classList.remove('was-validated'); this.ui.employeeFormError.style.display = 'none'; this.ui.employeeId.value = employeeId || '';
-    if (employeeId) { /* ... (lógica modo edição) ... */ } else { /* ... (lógica modo cadastro) ... */ }
+    if (employeeId) {
+      this.ui.employeeFormModalLabel.textContent = "Editar Funcionário"; this.ui.btnSaveChangesEmployee.textContent = "Salvar Alterações"; this.ui.passwordFieldContainer.style.display = 'block'; this.ui.employeePassword.required = false; this.ui.passwordHelp.textContent = 'Deixe em branco para não alterar a senha.'; this.ui.employeeEmail.disabled = true; const employee = this.state.employeeList.find(emp => emp.id === employeeId); if (employee) { this.ui.employeeFullName.value = employee.fullName || ''; this.ui.employeeEmail.value = employee.email || ''; this.ui.employeeRole.value = employee.role || 'employee'; this.ui.employeeWeeklyHours.value = employee.weeklyHours || ''; this.ui.employeeBirthDate.value = this.formatDateISO(employee.birthDate); this.ui.employeeHireDate.value = this.formatDateISO(employee.hireDate); this.ui.employeePhotoUrl.value = employee.photoUrl || ''; } else { console.error("Funcionário para edição não encontrado no cache local."); this.ui.employeeFormError.textContent = 'Erro: Funcionário não encontrado para edição.'; this.ui.employeeFormError.style.display = 'block'; }
+    } else { this.ui.employeeFormModalLabel.textContent = "Cadastrar Novo Funcionário"; this.ui.btnSaveChangesEmployee.textContent = "Cadastrar Funcionário"; this.ui.passwordFieldContainer.style.display = 'block'; this.ui.employeePassword.required = true; this.ui.passwordHelp.textContent = 'Obrigatório para novos funcionários (mínimo 6 caracteres).'; this.ui.employeeEmail.disabled = false; }
   }
 
   async handleSaveEmployeeForm() {
