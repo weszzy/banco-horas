@@ -1,7 +1,7 @@
 // src/views/script.js
 /**
- * Sistema de Controle de Ponto v1.3.12
- * Reforça abertura programática de modais e corrige acesso a elementos internos.
+ * Sistema de Controle de Ponto v1.3.13
+ * Corrige erro 'Invalid left-hand side in assignment' no listener hidden.bs.modal.
  */
 
 class PontoApp {
@@ -79,45 +79,40 @@ class PontoApp {
 
   // Garante que uma instância de modal exista, criando-a se necessário
   _ensureModalInstance(modalName) {
-    // Retorna null se o elemento base do modal não foi encontrado no cache
-    if (!this.ui[modalName + 'Element']) {
-      console.error(`[Modal] Elemento DOM base para ${modalName} não encontrado no cache.`);
-      return null;
-    }
-    // Cria a instância se ela ainda for null
+    const element = this.ui[modalName + 'Element'];
+    if (!element) { console.error(`[Modal] Elemento DOM para ${modalName} não encontrado.`); return null; }
     if (!this.ui[modalName]) {
-      console.log(`[Modal] Criando instância Bootstrap para ${modalName} sob demanda...`);
-      // Verifica se o Bootstrap está disponível
+      console.log(`[Modal] Criando instância Bootstrap para ${modalName}...`);
       if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
         try {
-          this.ui[modalName] = new bootstrap.Modal(this.ui[modalName + 'Element']);
-          // Adiciona listener genérico de limpeza ao fechar (se aplicável)
-          this.ui[modalName + 'Element'].addEventListener('hidden.bs.modal', () => {
-            console.log(`[Modal] ${modalName} fechado (hidden.bs.modal).`);
-            // Limpeza específica pode ser adicionada aqui se necessário
-            if (modalName === 'loginModal') {
-              this.ui[modalName + 'Element'].querySelector('#loginError')?.style.display = 'none';
-              this.ui[modalName + 'Element'].querySelector('#loginForm')?.reset();
+          this.ui[modalName] = new bootstrap.Modal(element);
+          // Adiciona listener para limpar erros/forms quando o modal é FECHADO
+          element.addEventListener('hidden.bs.modal', () => {
+            console.log(`[Modal] ${modalName} fechado (hidden.bs.modal). Cleaning up...`);
+            // --- CORREÇÃO AQUI ---
+            // Verifica se o elemento existe ANTES de tentar acessar style.display
+            const loginErrorElement = element.querySelector('#loginError');
+            if (loginErrorElement) {
+              loginErrorElement.style.display = 'none';
             }
-            if (modalName === 'employeeFormModal') {
-              const form = this.ui[modalName + 'Element'].querySelector('#employeeForm');
-              form?.reset();
-              form?.classList.remove('was-validated');
-              this.ui[modalName + 'Element'].querySelector('#employeeFormError')?.style.display = 'none';
+            const loginFormElement = element.querySelector('#loginForm');
+            loginFormElement?.reset(); // Usa optional chaining para reset
+
+            const employeeFormElement = element.querySelector('#employeeForm');
+            if (employeeFormElement) {
+              employeeFormElement.reset();
+              employeeFormElement.classList.remove('was-validated');
             }
+            const employeeFormErrorElement = element.querySelector('#employeeFormError');
+            if (employeeFormErrorElement) {
+              employeeFormErrorElement.style.display = 'none';
+            }
+            // ---------------------
           });
           console.log(`[Modal] Instância para ${modalName} criada com sucesso.`);
-        } catch (error) {
-          console.error(`[Modal] Erro ao criar instância Bootstrap para ${modalName}:`, error);
-          return null; // Retorna null se a criação falhar
-        }
-
-      } else {
-        console.error(`[Modal] Bootstrap Modal component indisponível para criar ${modalName}.`);
-        return null;
-      }
+        } catch (error) { console.error(`[Modal] Erro ao criar instância Bootstrap para ${modalName}:`, error); return null; }
+      } else { console.error(`[Modal] Bootstrap indisponível para criar ${modalName}.`); return null; }
     }
-    // Retorna a instância (existente ou recém-criada)
     return this.ui[modalName];
   }
 
