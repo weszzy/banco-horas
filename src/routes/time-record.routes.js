@@ -6,38 +6,31 @@ const { authenticate, authorize } = require('../middlewares/auth.middleware');
 
 // === ROTAS PARA /api/time-records ===
 
-// router.use(authenticate); // <<<< TEMPORARIAMENTE COMENTADO PARA TESTE
-
-// --- Rotas Mais Específicas PRIMEIRO ---
+// ROTA DE TESTE SIMPLES (Pode manter ou remover)
 router.get('/ping', (req, res) => { /* ... */ });
 
-// Rota para criar registro manual (Admin Only) - PRECISA DE AUTH
-router.post('/manual',
-    authenticate, // Adicionado individualmente
-    authorize(['admin']),
-    timeRecordController.createManualRecord
-);
+// --- Rotas que PRECISAM de Autenticação ---
 
-// Rota para obter o registro de HOJE do usuário logado - DEIXAR PÚBLICA TEMPORARIAMENTE
-router.get('/today', timeRecordController.getTodaysRecord);
+// Aplica authenticate a todas as rotas definidas DEPOIS desta linha
+router.use(authenticate);
 
+// Rota para criar registro manual (Admin Only)
+router.post('/manual', authorize(['admin']), timeRecordController.createManualRecord);
 
-// --- Rotas de Ponto do Funcionário - PRECISAM DE AUTH ---
-router.post('/check-in', authenticate, timeRecordController.checkIn);
-router.post('/lunch-start', authenticate, timeRecordController.startLunch);
-router.post('/lunch-end', authenticate, timeRecordController.endLunch);
-router.post('/check-out', authenticate, timeRecordController.checkOut);
+// Rota para obter o registro de HOJE do usuário logado
+router.get('/today', timeRecordController.getTodaysRecord); // Agora está protegida por router.use(authenticate)
 
-// --- Rotas com Parâmetros - PRECISAM DE AUTH ---
-// Histórico requer autenticação, pois pode expor dados
-router.get('/employee/:employeeId', authenticate, timeRecordController.getHistory);
-router.get('/employee/:employeeId/balance-history', authenticate, timeRecordController.getBalanceHistory);
+// Rotas de Ponto do Funcionário
+router.post('/check-in', timeRecordController.checkIn);
+router.post('/lunch-start', timeRecordController.startLunch);
+router.post('/lunch-end', timeRecordController.endLunch);
+router.post('/check-out', timeRecordController.checkOut);
 
-// Remover um registro específico (Admin Only) - PRECISA DE AUTH
-router.delete('/:recordId(\\d+)',
-    authenticate, // Adicionado individualmente
-    authorize(['admin']),
-    timeRecordController.deleteRecord
-);
+// Rotas de Histórico (Também precisam de autenticação)
+router.get('/employee/:employeeId', timeRecordController.getHistory);
+router.get('/employee/:employeeId/balance-history', timeRecordController.getBalanceHistory);
+
+// Rotas Administrativas (Já tinham authorize, mas precisam de authenticate antes)
+router.delete('/:recordId(\\d+)', authorize(['admin']), timeRecordController.deleteRecord );
 
 module.exports = router;

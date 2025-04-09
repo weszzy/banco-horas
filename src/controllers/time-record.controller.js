@@ -192,16 +192,36 @@ class TimeRecordController {
    * @description Busca o registro de ponto (aberto ou fechado) de HOJE para o usuário logado.
    */
   async getTodaysRecord(req, res) {
-    const employeeId = req.user.id;
+    const employeeId = req.user.id; // << Ponto de Falha Potencial 1
     try {
-      const openRecord = await this._findOpenRecordToday(employeeId);
-      if (openRecord) { return sendResponse(res, 200, 'Registro de hoje encontrado (em andamento).', openRecord); }
-      const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0); const todayEnd = new Date(todayStart); todayEnd.setDate(todayStart.getDate() + 1);
-      const closedRecord = await TimeRecord.findOne({ where: { employeeId: employeeId, startTime: { [Op.gte]: todayStart, [Op.lt]: todayEnd }, endTime: { [Op.ne]: null } }, order: [['startTime', 'DESC']] });
-      if (closedRecord) { return sendResponse(res, 200, 'Registro de hoje encontrado (já finalizado).', closedRecord); }
-      return sendResponse(res, 404, 'Nenhum registro de ponto encontrado para hoje.');
+      // 'this' aqui estará correto por causa do bind no construtor
+      const openRecord = await this._findOpenRecordToday(employeeId); // Chama método interno
+      if (openRecord) {
+        return sendResponse(res, 200, 'Registro de hoje encontrado (em andamento).', openRecord);
+      }
+      // Se não houver aberto, procura por um fechado hoje
+      const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+      const todayEnd = new Date(todayStart); todayEnd.setDate(todayStart.getDate() + 1);
+      const closedRecord = await TimeRecord.findOne({
+        where: {
+          employeeId: employeeId,
+          startTime: { [Op.gte]: todayStart, [Op.lt]: todayEnd },
+          endTime: { [Op.ne]: null }
+        },
+        order: [['startTime', 'DESC']]
+      });
+      if (closedRecord) {
+        return sendResponse(res, 200, 'Registro de hoje encontrado (já finalizado).', closedRecord);
+      }
+      // Se não encontrou nem aberto nem fechado
+      // << Ponto de Falha Potencial 2: Deveria retornar 404 aqui explicitamente
+      //    Se sendResponse não for chamado, a requisição fica "pendurada"
+      return sendResponse(res, 404, 'Nenhum registro de ponto encontrado para hoje.'); // << GARANTIR QUE ESTA LINHA SEJA ATINGIDA
     } catch (error) {
+      // Adiciona o stack trace ao log para mais detalhes
       logger.error(`Erro ao buscar registro de hoje para employeeId ${employeeId}: ${error.message}`, { stack: error.stack });
+      // << Ponto de Falha Potencial 3: Erro no catch não tratado corretamente?
+      //    sendResponse deveria funcionar, mas se houver erro *antes* dele...
       sendResponse(res, 500, 'Erro interno ao buscar registro de hoje.');
     }
   }
