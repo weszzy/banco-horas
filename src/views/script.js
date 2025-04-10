@@ -2,6 +2,7 @@
 /**
  * Sistema de Controle de Ponto v1.3.13
  * Corrige erro 'Invalid left-hand side in assignment' no listener hidden.bs.modal.
+ * Preserva toda a lógica original de v1.3.12.
  */
 
 class PontoApp {
@@ -13,7 +14,7 @@ class PontoApp {
 
   // Cacheia elementos DOM principais que sempre existem
   _cacheDOMElements() {
-    console.log("[CacheDOM v1.3.12] Caching DOM Elements...");
+    console.log("[CacheDOM v1.3.13] Caching DOM Elements..."); // Versão atualizada
     this.ui = {
       // Referências aos elementos dos Modais (para criar instância depois)
       loginModalElement: document.getElementById('loginModal'),
@@ -61,7 +62,7 @@ class PontoApp {
       linkMeuPerfilRapido: document.getElementById('linkMeuPerfilRapido'),
       // Admin Area
       employeeListTableBody: document.getElementById('employeeListTableBody'),
-      // Elementos internos dos modais não são mais cacheados aqui
+      // Elementos internos dos modais não são cacheados aqui
     };
     console.log("[CacheDOM] Main DOM Elements cached.");
   }
@@ -72,7 +73,7 @@ class PontoApp {
     const canInitOffcanvas = typeof bootstrap !== 'undefined' && bootstrap.Offcanvas;
     if (this.ui.mainOffcanvasElement && canInitOffcanvas) { this.ui.mainOffcanvas = new bootstrap.Offcanvas(this.ui.mainOffcanvasElement); }
     else { console.warn("[InitComp] Offcanvas init failed."); }
-    // NÃO inicializa modais aqui
+    // NÃO inicializa modais aqui, eles serão inicializados sob demanda em _ensureModalInstance
     this.state = { token: localStorage.getItem('authToken') || null, currentUser: JSON.parse(localStorage.getItem('currentUser')) || null, selectedEmployeeId: null, viewingEmployeeId: null, todayRecord: null, employeeList: [], currentView: 'login' };
     console.log("[InitComp] State and non-modal components initialized.");
   }
@@ -87,16 +88,18 @@ class PontoApp {
         try {
           this.ui[modalName] = new bootstrap.Modal(element);
           // Adiciona listener para limpar erros/forms quando o modal é FECHADO
+          // Usando addEventListener para evitar sobrescrever outros possíveis listeners 'hidden'
           element.addEventListener('hidden.bs.modal', () => {
             console.log(`[Modal] ${modalName} fechado (hidden.bs.modal). Cleaning up...`);
-            // --- CORREÇÃO AQUI ---
-            // Verifica se o elemento existe ANTES de tentar acessar style.display
+
+            // --- CORREÇÃO APLICADA AQUI ---
+            // Busca o elemento interno e *verifica se existe* antes de modificar
             const loginErrorElement = element.querySelector('#loginError');
             if (loginErrorElement) {
               loginErrorElement.style.display = 'none';
             }
             const loginFormElement = element.querySelector('#loginForm');
-            loginFormElement?.reset(); // Usa optional chaining para reset
+            loginFormElement?.reset(); // Pode usar optional chaining para métodos
 
             const employeeFormElement = element.querySelector('#employeeForm');
             if (employeeFormElement) {
@@ -107,7 +110,7 @@ class PontoApp {
             if (employeeFormErrorElement) {
               employeeFormErrorElement.style.display = 'none';
             }
-            // ---------------------
+            // --- FIM DA CORREÇÃO ---
           });
           console.log(`[Modal] Instância para ${modalName} criada com sucesso.`);
         } catch (error) { console.error(`[Modal] Erro ao criar instância Bootstrap para ${modalName}:`, error); return null; }
@@ -118,137 +121,98 @@ class PontoApp {
 
 
   _init() {
-    console.log("PontoApp v1.3.12 _init called...");
-    this._initializeComponents(); // Inicializa estado e Offcanvas
-    this._setupStaticEventListeners(); // Configura listeners estáticos (fora dos modais)
+    console.log("PontoApp v1.3.13 _init called..."); // Versão corrigida
+    this._initializeComponents();
+    this._setupStaticEventListeners();
     this._initSelect2();
-    this._updateView(); // Define visão inicial e adiciona listeners dinâmicos (navbar/offcanvas)
-    this._setupAllModalEventListeners(); // Configura listeners internos dos modais (serão anexados quando o modal for usado)
+    this._updateView();
+    this._setupAllModalEventListeners();
   }
 
   // Listeners para elementos estáticos fora dos modais
   _setupStaticEventListeners() {
     console.log("[Listeners] Setting up static event listeners...");
-    // --- Login Triggers ---
-    if (this.ui.btnLoginPromptTrigger) {
-      this.ui.btnLoginPromptTrigger.addEventListener('click', () => {
-        console.log("[Listeners] Botão Login (Prompt) clicado.");
-        const modal = this._ensureModalInstance('loginModal'); // Garante/Cria instância
-        if (modal) modal.show(); else this.showAlert('danger', 'Erro ao abrir login.');
-      });
-    } else { console.warn("[Listeners] Static Warning: btnLoginPromptTrigger not found."); }
-
-    // --- Botão Novo Funcionário (Área Admin) ---
-    if (this.ui.btnNovoFuncAdminArea) {
-      this.ui.btnNovoFuncAdminArea.addEventListener('click', () => {
-        console.log("[Listeners] Botão Novo Func (Admin Area) clicado.");
-        this.prepareEmployeeForm(null); // Prepara os dados (mas não busca elementos internos ainda)
-        const modal = this._ensureModalInstance('employeeFormModal'); // Garante/Cria instância
-        if (modal) modal.show(); else this.showAlert('danger', 'Erro ao abrir formulário.');
-      });
-    } else { console.warn("[Listeners] Static Warning: btnNovoFuncAdminArea not found."); }
-
-    // --- Botões de Ponto ---
+    if (this.ui.btnLoginPromptTrigger) { this.ui.btnLoginPromptTrigger.addEventListener('click', () => { console.log("[Listeners] Botão Login (Prompt) clicado."); const modal = this._ensureModalInstance('loginModal'); if (modal) modal.show(); else this.showAlert('danger', 'Erro login.'); }); } else { console.warn("[Listeners] Static Warning: btnLoginPromptTrigger not found."); }
+    if (this.ui.btnNovoFuncAdminArea) { this.ui.btnNovoFuncAdminArea.addEventListener('click', () => { console.log("[Listeners] Botão Novo Func (Admin Area) clicado."); this.prepareEmployeeForm(null); const modal = this._ensureModalInstance('employeeFormModal'); if (modal) modal.show(); else this.showAlert('danger', 'Erro formulário.'); }); } else { console.warn("[Listeners] Static Warning: btnNovoFuncAdminArea not found."); }
     if (this.ui.btnEntradaMobile) this.ui.btnEntradaMobile.addEventListener('click', () => this.registrarPonto('check-in')); else console.error("[Listeners] Static Error: btnEntradaMobile not found");
     if (this.ui.btnSaidaAlmocoMobile) this.ui.btnSaidaAlmocoMobile.addEventListener('click', () => this.registrarPonto('lunch-start')); else console.error("[Listeners] Static Error: btnSaidaAlmocoMobile not found");
     if (this.ui.btnRetornoAlmocoMobile) this.ui.btnRetornoAlmocoMobile.addEventListener('click', () => this.registrarPonto('lunch-end')); else console.error("[Listeners] Static Error: btnRetornoAlmocoMobile not found");
     if (this.ui.btnSaidaMobile) this.ui.btnSaidaMobile.addEventListener('click', () => this.registrarPonto('check-out')); else console.error("[Listeners] Static Error: btnSaidaMobile not found");
-    // --- Select2 Admin ---
     if (this.ui.employeeSelectMobile?.length > 0) { this.ui.employeeSelectMobile.on('change', (e) => { const sv = $(e.target).val(); this.state.selectedEmployeeId = sv ? parseInt(sv, 10) : this.state.currentUser?.id; this.handleEmployeeSelectionChange(); }); } else { console.error("[Listeners] Static Error: employeeSelectMobile not found.") }
-    // --- Botão Ver Perfil Rápido ---
     if (this.ui.linkMeuPerfilRapido) { this.ui.linkMeuPerfilRapido.addEventListener('click', (e) => { e.preventDefault(); const tid = this.state.currentUser?.id; console.log("[Listeners] Link 'Meu Perfil Rápido' clicado. Target ID:", tid); if (tid) { this.showProfileModal(tid); } else { this.showAlert('info', 'Faça login.'); } }); } else { console.error("[Listeners] Static Error: linkMeuPerfilRapido not found"); }
-    // --- Listener para o EVENTO 'show' do modal de formulário (para preparar o form) ---
-    // Este listener ainda é útil para PREPARAR os dados do form ANTES do modal ser completamente visível
     if (this.ui.employeeFormModalElement) { this.ui.employeeFormModalElement.addEventListener('show.bs.modal', (e) => { const btn = e.relatedTarget; const empId = btn?.dataset.employeeId; this.prepareEmployeeForm(empId ? parseInt(empId, 10) : null); }); } else { console.error("[Listeners] Static Error: employeeFormModalElement not found."); }
-
     console.log("[Listeners] Static event listeners set up completed.");
   }
 
-  // Configura listeners para elementos DENTRO de todos os modais (chamado uma vez no _init)
-  // A ideia agora é que ele prepare os listeners, que serão efetivamente usados quando o modal for aberto
+  // Configura listeners para elementos DENTRO de todos os modais
   _setupAllModalEventListeners() {
     console.log("[Listeners] Setting up ALL modal event listeners...");
-    // --- Login Modal Listeners ---
     const loginModalElement = this.ui.loginModalElement;
     if (loginModalElement) {
       const loginForm = loginModalElement.querySelector('#loginForm');
       const btnSubmit = loginModalElement.querySelector('#btnLoginSubmit');
-      // Anexa listeners aos elementos internos SE eles existirem
-      if (loginForm && !loginForm.listenerAttached) { loginForm.addEventListener('submit', (e) => { e.preventDefault(); this.handleLogin(); }); loginForm.listenerAttached = true; }
-      else if (!loginForm) { console.error("[Listeners] loginForm not found inside loginModal."); }
-      if (btnSubmit && !btnSubmit.listenerAttached) { btnSubmit.addEventListener('click', () => this.handleLogin()); btnSubmit.listenerAttached = true; }
-      else if (!btnSubmit) { console.error("[Listeners] btnLoginSubmit not found inside loginModal."); }
+      if (loginForm && !loginForm.listenerAttached) { loginForm.addEventListener('submit', (e) => { e.preventDefault(); this.handleLogin(); }); loginForm.listenerAttached = true; } else if (!loginForm) { console.error("[Listeners] loginForm not found in loginModal."); }
+      if (btnSubmit && !btnSubmit.listenerAttached) { btnSubmit.addEventListener('click', () => this.handleLogin()); btnSubmit.listenerAttached = true; } else if (!btnSubmit) { console.error("[Listeners] btnLoginSubmit not found in loginModal."); }
     } else { console.error("[Listeners] loginModalElement not found."); }
-
-    // --- Employee Form Modal Listeners ---
     const employeeModalElement = this.ui.employeeFormModalElement;
     if (employeeModalElement) {
       const employeeForm = employeeModalElement.querySelector('#employeeForm');
       const btnSave = employeeModalElement.querySelector('#btnSaveChangesEmployee');
-      if (employeeForm && !employeeForm.listenerAttached) { employeeForm.addEventListener('submit', (e) => { e.preventDefault(); this.handleSaveEmployeeForm(); }); employeeForm.listenerAttached = true; }
-      else if (!employeeForm) { console.error("[Listeners] employeeForm not found in employeeModal."); }
-      if (btnSave && !btnSave.listenerAttached) { btnSave.addEventListener('click', () => this.handleSaveEmployeeForm()); btnSave.listenerAttached = true; }
-      else if (!btnSave) { console.error("[Listeners] btnSaveChangesEmployee not found in employeeModal."); }
+      if (employeeForm && !employeeForm.listenerAttached) { employeeForm.addEventListener('submit', (e) => { e.preventDefault(); this.handleSaveEmployeeForm(); }); employeeForm.listenerAttached = true; } else if (!employeeForm) { console.error("[Listeners] employeeForm not found in employeeModal."); }
+      if (btnSave && !btnSave.listenerAttached) { btnSave.addEventListener('click', () => this.handleSaveEmployeeForm()); btnSave.listenerAttached = true; } else if (!btnSave) { console.error("[Listeners] btnSaveChangesEmployee not found in employeeModal."); }
       employeeModalElement.querySelectorAll('input, select').forEach(input => { if (!input.listenerAttached) { input.addEventListener('input', () => { if (employeeForm?.classList.contains('was-validated')) { this._validateEmployeeForm(); } }); input.listenerAttached = true; } });
     } else { console.error("[Listeners] employeeFormModalElement not found."); }
-
-    // --- Profile Modal Listeners ---
     const profileModalElement = this.ui.profileModalElement;
     if (profileModalElement) {
       const btnEdit = profileModalElement.querySelector('#btnEditProfile');
       const btnToggle = profileModalElement.querySelector('#btnToggleActiveStatus');
-      if (btnEdit && !btnEdit.listenerAttached) { btnEdit.addEventListener('click', () => this.editProfileFromModal()); btnEdit.listenerAttached = true; }
-      else if (!btnEdit) { console.error("[Listeners] btnEditProfile not found in profileModal."); }
-      if (btnToggle && !btnToggle.listenerAttached) { btnToggle.addEventListener('click', () => this.toggleActiveStatusFromModal()); btnToggle.listenerAttached = true; }
-      else if (!btnToggle) { console.error("[Listeners] btnToggleActiveStatus not found in profileModal."); }
-      // Listeners para botões delete na tabela são adicionados em renderProfileModalContent
+      if (btnEdit && !btnEdit.listenerAttached) { btnEdit.addEventListener('click', () => this.editProfileFromModal()); btnEdit.listenerAttached = true; } else if (!btnEdit) { console.error("[Listeners] btnEditProfile not found in profileModal."); }
+      if (btnToggle && !btnToggle.listenerAttached) { btnToggle.addEventListener('click', () => this.toggleActiveStatusFromModal()); btnToggle.listenerAttached = true; } else if (!btnToggle) { console.error("[Listeners] btnToggleActiveStatus not found in profileModal."); }
     } else { console.error("[Listeners] profileModalElement not found."); }
     console.log("[Listeners] All modal event listeners set up.");
   }
 
-  // Adiciona listeners para elementos que são criados/exibidos dinamicamente NA NAVBAR/OFFCANVAS
+  // Listeners para elementos dinâmicos (Navbar/Offcanvas)
   _setupDynamicEventListeners() {
     console.log("[Listeners] Setting up dynamic event listeners for Offcanvas/Navbar...");
-    // Botão Logout (Offcanvas)
     const btnLogout = document.getElementById('btnLogoutOffcanvas');
     if (btnLogout) { if (!btnLogout.onclick) { btnLogout.onclick = (e) => { e.preventDefault(); this.ui.mainOffcanvas?.hide(); this.handleLogout(); }; console.log("[Listeners] Dynamic Listener: Logout (Offcanvas) attached."); } }
     else { if (this.state.currentUser) console.warn("[Listeners] Dynamic Warning: btnLogoutOffcanvas not found."); }
-    // Links Offcanvas
     const linkMeuPerfil = document.getElementById('linkMeuPerfilOffcanvas');
     if (linkMeuPerfil) { if (!linkMeuPerfil.onclick) { linkMeuPerfil.onclick = (e) => { e.preventDefault(); this.ui.mainOffcanvas?.hide(); if (this.state.currentUser?.id) { this.showProfileModal(this.state.currentUser.id); } else { this.showAlert('danger', 'Erro: Usuário não logado.'); } }; console.log("[Listeners] Dynamic Listener: Meu Perfil (Offcanvas) attached."); } }
     else { if (this.ui.navLinksOffcanvas?.style.display !== 'none') console.warn("[Listeners] Dynamic Warning: linkMeuPerfilOffcanvas not found."); }
     const linkGerenciar = document.getElementById('linkGerenciarFuncionariosOffcanvas');
     if (linkGerenciar) { if (!linkGerenciar.onclick) { linkGerenciar.onclick = (e) => { e.preventDefault(); this.ui.mainOffcanvas?.hide(); this.setView('admin'); }; console.log("[Listeners] Dynamic Listener: Gerenciar (Offcanvas) attached."); } }
     else { if (this.ui.navAdminLinksOffcanvas?.style.display !== 'none') console.warn("[Listeners] Dynamic Warning: linkGerenciarFuncionariosOffcanvas not found."); }
-    // Link Novo Funcionário (Offcanvas)
     const linkNovoFunc = document.getElementById('linkNovoFuncionarioOffcanvas');
-    if (linkNovoFunc) {
-      if (!linkNovoFunc.onclick) {
-        linkNovoFunc.onclick = (e) => { e.preventDefault(); console.log("[Listeners] Link Novo Funcionário (Offcanvas) clicado."); if (this.ui.mainOffcanvas) this.ui.mainOffcanvas.hide(); this.prepareEmployeeForm(null); const modal = this.ui.employeeFormModal; if (modal) modal.show(); else this.showAlert('danger', 'Erro ao abrir formulário.'); };
-        console.log("[Listeners] Dynamic Listener: Novo Funcionário (Offcanvas) attached.");
-      }
-    } else { if (this.ui.navAdminLinksOffcanvas?.style.display !== 'none') console.warn("[Listeners] Dynamic Warning: linkNovoFuncionarioOffcanvas not found."); }
-    // Botão de Login na Navbar (quando deslogado)
+    if (linkNovoFunc) { if (!linkNovoFunc.onclick) { linkNovoFunc.onclick = (e) => { e.preventDefault(); console.log("[Listeners] Link Novo Funcionário (Offcanvas) clicado."); if (this.ui.mainOffcanvas) this.ui.mainOffcanvas.hide(); this.prepareEmployeeForm(null); const modal = this.ui.employeeFormModal || this._ensureModalInstance('employeeFormModal'); if (modal) modal.show(); else this.showAlert('danger', 'Erro ao abrir formulário.'); }; console.log("[Listeners] Dynamic Listener: Novo Funcionário (Offcanvas) attached."); } } else { if (this.ui.navAdminLinksOffcanvas?.style.display !== 'none') console.warn("[Listeners] Dynamic Warning: linkNovoFuncionarioOffcanvas not found."); }
     if (!this.state.token) {
       const btnLoginTriggerNavbar = document.getElementById('btnLoginTrigger');
-      if (btnLoginTriggerNavbar) {
-        if (!btnLoginTriggerNavbar.onclick) {
-          btnLoginTriggerNavbar.onclick = () => { console.log("[Listeners] Botão Login (Navbar) clicado."); const modal = this.ui.loginModal; if (modal) modal.show(); else this.showAlert('danger', 'Erro ao abrir login.'); };
-          console.log("[Listeners] Dynamic Listener: Login (Navbar) attached.");
-        }
-      } else { console.warn("[Listeners] Dynamic Warning: btnLoginTrigger (Navbar) not found."); }
+      if (btnLoginTriggerNavbar) { if (!btnLoginTriggerNavbar.onclick) { btnLoginTriggerNavbar.onclick = () => { console.log("[Listeners] Botão Login (Navbar) clicado."); const modal = this.ui.loginModal || this._ensureModalInstance('loginModal'); if (modal) modal.show(); else this.showAlert('danger', 'Erro ao abrir login.'); }; console.log("[Listeners] Dynamic Listener: Login (Navbar) attached."); } } else { console.warn("[Listeners] Dynamic Warning: btnLoginTrigger (Navbar) not found."); }
     }
     console.log("[Listeners] Dynamic event listeners for Navbar/Offcanvas set up completed.");
   }
 
-
   // ================ MÉTODOS RESTANTES (LÓGICA PRESERVADA) ================
 
-  _initSelect2() { const targetSelect = this.ui.employeeSelectMobile; if (targetSelect && targetSelect.length > 0 && typeof $.fn.select2 === 'function') { try { targetSelect.select2({ placeholder: "Visualizar outro...", allowClear: true, width: '100%', dropdownParent: targetSelect.parent() }); targetSelect.prop('disabled', true); console.log("Select2 initialized for mobile."); } catch (error) { console.error("Erro ao inicializar Select2:", error); this.showAlert('warning', 'Erro seletor func.') } } else if (!(typeof $.fn.select2 === 'function')) { console.error("Select2 function not available."); } else { console.error("Select2 element (mobile) not found."); } }
-  setView(viewName) { console.log(`Setting view to: ${viewName}`); this.state.currentView = viewName; if (this.ui.loginPrompt) this.ui.loginPrompt.style.display = viewName === 'login' ? 'block' : 'none'; if (this.ui.dashboardArea) this.ui.dashboardArea.style.display = viewName === 'dashboard' ? 'block' : 'none'; if (this.ui.adminArea) this.ui.adminArea.style.display = viewName === 'admin' ? 'block' : 'none'; if (viewName === 'admin') { this.loadAndDisplayAdminEmployeeList(); } else if (viewName === 'dashboard') { this.fetchAndUpdateDashboard(); } this._updateNavLinks(); }
-  _updateView() { console.log("Updating view based on auth state..."); if (this.state.token && this.state.currentUser) { if (this.ui.navLinksOffcanvas) this.ui.navLinksOffcanvas.style.display = 'block'; else console.error("navLinksOffcanvas missing"); if (this.ui.navLogoutOffcanvas) this.ui.navLogoutOffcanvas.style.display = 'block'; else console.error("navLogoutOffcanvas missing"); if (this.ui.authArea) { this.ui.authArea.innerHTML = `<span class="navbar-text me-3 small text-white-50">Olá, ${this.state.currentUser.fullName.split(' ')[0]}</span>`; } else { console.error("authArea missing"); } if (this.state.currentUser.role === 'admin') { if (this.ui.navAdminLinksOffcanvas) this.ui.navAdminLinksOffcanvas.style.display = 'block'; else console.error("navAdminLinksOffcanvas missing"); if (this.ui.navAdminSeparatorOffcanvas) this.ui.navAdminSeparatorOffcanvas.style.display = 'block'; else console.error("navAdminSeparatorOffcanvas missing"); if (this.ui.employeeSelectContainerMobile) this.ui.employeeSelectContainerMobile.style.display = 'block'; if (this.ui.employeeSelectMobile?.length > 0) this.ui.employeeSelectMobile.prop('disabled', false); this.setView(this.state.currentView !== 'login' ? this.state.currentView : 'dashboard'); } else { if (this.ui.navAdminLinksOffcanvas) this.ui.navAdminLinksOffcanvas.style.display = 'none'; if (this.ui.navAdminSeparatorOffcanvas) this.ui.navAdminSeparatorOffcanvas.style.display = 'none'; if (this.ui.employeeSelectContainerMobile) this.ui.employeeSelectContainerMobile.style.display = 'none'; if (this.ui.employeeSelectMobile?.length > 0) this.ui.employeeSelectMobile.prop('disabled', true); this.setView('dashboard'); } setTimeout(() => this._setupDynamicEventListeners(), 0); } else { if (this.ui.navLinksOffcanvas) this.ui.navLinksOffcanvas.style.display = 'none'; if (this.ui.navAdminLinksOffcanvas) this.ui.navAdminLinksOffcanvas.style.display = 'none'; if (this.ui.navAdminSeparatorOffcanvas) this.ui.navAdminSeparatorOffcanvas.style.display = 'none'; if (this.ui.navLogoutOffcanvas) this.ui.navLogoutOffcanvas.style.display = 'none'; if (this.ui.authArea) { this.ui.authArea.innerHTML = `<button class="btn btn-primary btn-sm" id="btnLoginTrigger">Login</button>`; } this.setView('login'); setTimeout(() => this._setupDynamicEventListeners(), 0); } console.log("View update process finished."); }
+  _initSelect2() {
+    const targetSelect = this.ui.employeeSelectMobile; if (targetSelect && targetSelect.length > 0 && typeof $.fn.select2 === 'function') { try { targetSelect.select2({ placeholder: "Visualizar outro...", allowClear: true, width: '100%', dropdownParent: targetSelect.parent() }); targetSelect.prop('disabled', true); console.log("Select2 initialized for mobile."); } catch (error) { console.error("Erro ao inicializar Select2:", error); this.showAlert('warning', 'Erro seletor func.') } } else if (!(typeof $.fn.select2 === 'function')) { console.error("Select2 function not available."); } else { console.error("Select2 element (mobile) not found."); }
+  }
+
+  setView(viewName) {
+    console.log(`Setting view to: ${viewName}`); this.state.currentView = viewName; if (this.ui.loginPrompt) this.ui.loginPrompt.style.display = viewName === 'login' ? 'block' : 'none'; if (this.ui.dashboardArea) this.ui.dashboardArea.style.display = viewName === 'dashboard' ? 'block' : 'none'; if (this.ui.adminArea) this.ui.adminArea.style.display = viewName === 'admin' ? 'block' : 'none'; if (viewName === 'admin') { this.loadAndDisplayAdminEmployeeList(); } else if (viewName === 'dashboard') { this.fetchAndUpdateDashboard(); } this._updateNavLinks();
+  }
+
+  _updateView() {
+    console.log("Updating view based on auth state..."); if (this.state.token && this.state.currentUser) { if (this.ui.navLinksOffcanvas) this.ui.navLinksOffcanvas.style.display = 'block'; else console.error("navLinksOffcanvas missing"); if (this.ui.navLogoutOffcanvas) this.ui.navLogoutOffcanvas.style.display = 'block'; else console.error("navLogoutOffcanvas missing"); if (this.ui.authArea) { this.ui.authArea.innerHTML = `<span class="navbar-text me-3 small text-white-50">Olá, ${this.state.currentUser.fullName.split(' ')[0]}</span>`; } else { console.error("authArea missing"); } if (this.state.currentUser.role === 'admin') { if (this.ui.navAdminLinksOffcanvas) this.ui.navAdminLinksOffcanvas.style.display = 'block'; else console.error("navAdminLinksOffcanvas missing"); if (this.ui.navAdminSeparatorOffcanvas) this.ui.navAdminSeparatorOffcanvas.style.display = 'block'; else console.error("navAdminSeparatorOffcanvas missing"); if (this.ui.employeeSelectContainerMobile) this.ui.employeeSelectContainerMobile.style.display = 'block'; if (this.ui.employeeSelectMobile?.length > 0) this.ui.employeeSelectMobile.prop('disabled', false); this.setView(this.state.currentView !== 'login' ? this.state.currentView : 'dashboard'); } else { if (this.ui.navAdminLinksOffcanvas) this.ui.navAdminLinksOffcanvas.style.display = 'none'; if (this.ui.navAdminSeparatorOffcanvas) this.ui.navAdminSeparatorOffcanvas.style.display = 'none'; if (this.ui.employeeSelectContainerMobile) this.ui.employeeSelectContainerMobile.style.display = 'none'; if (this.ui.employeeSelectMobile?.length > 0) this.ui.employeeSelectMobile.prop('disabled', true); this.setView('dashboard'); } setTimeout(() => this._setupDynamicEventListeners(), 0); } else { if (this.ui.navLinksOffcanvas) this.ui.navLinksOffcanvas.style.display = 'none'; if (this.ui.navAdminLinksOffcanvas) this.ui.navAdminLinksOffcanvas.style.display = 'none'; if (this.ui.navAdminSeparatorOffcanvas) this.ui.navAdminSeparatorOffcanvas.style.display = 'none'; if (this.ui.navLogoutOffcanvas) this.ui.navLogoutOffcanvas.style.display = 'none'; if (this.ui.authArea) { this.ui.authArea.innerHTML = `<button class="btn btn-primary btn-sm" id="btnLoginTrigger">Login</button>`; } this.setView('login'); setTimeout(() => this._setupDynamicEventListeners(), 0); } console.log("View update process finished.");
+  }
+
   _updateNavLinks() { document.querySelectorAll('#mainOffcanvas .nav-link').forEach(link => link.classList.remove('active')); if (this.state.currentView === 'admin') { document.getElementById('linkGerenciarFuncionariosOffcanvas')?.classList.add('active'); } }
-  async handleLogin() { console.log("Handling login..."); const loginModal = this.ui.loginModal; if (!loginModal) { console.error("Login Modal not initialized."); return; } const loginForm = this.ui.loginModalElement?.querySelector('#loginForm'); const btnSubmit = this.ui.loginModalElement?.querySelector('#btnLoginSubmit'); const loginError = this.ui.loginModalElement?.querySelector('#loginError'); if (!loginForm || !btnSubmit || !loginError) { console.error("Elementos internos login modal não encontrados."); return; } this._setupAllModalEventListeners(); const email = loginForm.email.value; const password = loginForm.password.value; loginError.style.display = 'none'; if (!email || !password) { loginError.textContent = 'E-mail/senha obrigatórios.'; loginError.style.display = 'block'; return; } btnSubmit.disabled = true; btnSubmit.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Entrando...'; try { const response = await fetch('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) }); if (!response) throw new Error("Falha na requisição."); const result = await response.json(); if (!response.ok || !result.success) throw new Error(result.message || `Erro ${response.status}`); this.state.token = result.data.token; this.state.currentUser = result.data.user; localStorage.setItem('authToken', this.state.token); localStorage.setItem('currentUser', JSON.stringify(this.state.currentUser)); console.log("Login successful."); loginModal.hide(); this._updateView(); } catch (error) { console.error("Login failed:", error); loginError.textContent = `Falha: ${error.message}`; loginError.style.display = 'block'; } finally { btnSubmit.disabled = false; btnSubmit.innerHTML = 'Entrar'; } }
+
+  async handleLogin() {
+    console.log("Handling login..."); const loginModal = this._ensureModalInstance('loginModal'); if (!loginModal) { console.error("Login Modal not initialized."); return; } const loginForm = this.ui.loginModalElement?.querySelector('#loginForm'); const btnSubmit = this.ui.loginModalElement?.querySelector('#btnLoginSubmit'); const loginError = this.ui.loginModalElement?.querySelector('#loginError'); if (!loginForm || !btnSubmit || !loginError) { console.error("Elementos internos login modal não encontrados."); return; } this._setupAllModalEventListeners(); const email = loginForm.email.value; const password = loginForm.password.value; loginError.style.display = 'none'; if (!email || !password) { loginError.textContent = 'E-mail/senha obrigatórios.'; loginError.style.display = 'block'; return; } btnSubmit.disabled = true; btnSubmit.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Entrando...'; try { const response = await fetch('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) }); if (!response) throw new Error("Falha na requisição."); const result = await response.json(); if (!response.ok || !result.success) throw new Error(result.message || `Erro ${response.status}`); this.state.token = result.data.token; this.state.currentUser = result.data.user; localStorage.setItem('authToken', this.state.token); localStorage.setItem('currentUser', JSON.stringify(this.state.currentUser)); console.log("Login successful."); loginModal.hide(); this._updateView(); } catch (error) { console.error("Login failed:", error); loginError.textContent = `Falha: ${error.message}`; loginError.style.display = 'block'; } finally { btnSubmit.disabled = false; btnSubmit.innerHTML = 'Entrar'; }
+  }
+
   handleLogout() { console.log("Handling logout..."); this.state.token = null; this.state.currentUser = null; localStorage.removeItem('authToken'); localStorage.removeItem('currentUser'); if (this.ui.employeeSelectMobile?.length > 0) { this.ui.employeeSelectMobile.val(null).trigger('change'); this.ui.employeeSelectMobile.prop('disabled', true); } this._updateView(); this.resetDashboardState(); console.log("Logout complete."); }
   resetDashboardState() { console.log("Resetting dashboard state (mobile)..."); this.state.selectedEmployeeId = null; this.state.todayRecord = null; if (this.ui.employeeSelectMobile?.length > 0) { this.ui.employeeSelectMobile.val(null).trigger('change'); } if (this.ui.statusPlaceholderMobile) { this.ui.statusPlaceholderMobile.textContent = 'Carregando...'; this.ui.statusPlaceholderMobile.style.display = 'block'; } if (this.ui.statusDetailsMobile) this.ui.statusDetailsMobile.style.display = 'none'; if (this.ui.statusEntradaMobile) this.ui.statusEntradaMobile.textContent = '--:--'; if (this.ui.statusSaidaAlmocoMobile) this.ui.statusSaidaAlmocoMobile.textContent = '--:--'; if (this.ui.statusRetornoAlmocoMobile) this.ui.statusRetornoAlmocoMobile.textContent = '--:--'; if (this.ui.statusSaidaMobile) this.ui.statusSaidaMobile.textContent = '--:--'; if (this.ui.statusTotalHorasMobile) this.ui.statusTotalHorasMobile.textContent = '-.-- h'; if (this.ui.statusDateMobile) this.ui.statusDateMobile.textContent = '--/--'; if (this.ui.summaryLoadingMobile) { this.ui.summaryLoadingMobile.style.display = 'block'; this.ui.summaryLoadingMobile.innerHTML = `<span class="spinner-border spinner-border-sm"></span>`; } if (this.ui.summaryContentMobile) this.ui.summaryContentMobile.style.display = 'none'; if (this.ui.summaryBalanceMobile) this.ui.summaryBalanceMobile.textContent = '--:--'; this._setPointButtonsDisabled(true); }
   async fetchAndUpdateDashboard() { if (!this.state.currentUser) { console.warn("fetchAndUpdateDashboard: currentUser is null."); return; } console.log("Updating Dashboard..."); this.resetDashboardState(); let initialEmployeeId = this.state.currentUser.id; if (this.state.currentUser.role === 'admin') { if (this.ui.employeeSelectContainerMobile) this.ui.employeeSelectContainerMobile.style.display = 'block'; if (this.ui.employeeSelectMobile?.length > 0) this.ui.employeeSelectMobile.prop('disabled', false); await this.loadEmployeeListForAdmin(); initialEmployeeId = this.ui.employeeSelectMobile?.length > 0 ? (parseInt(this.ui.employeeSelectMobile.val(), 10) || this.state.currentUser.id) : this.state.currentUser.id; } else { if (this.ui.employeeSelectContainerMobile) this.ui.employeeSelectContainerMobile.style.display = 'none'; if (this.ui.employeeSelectMobile?.length > 0) this.ui.employeeSelectMobile.prop('disabled', true); initialEmployeeId = this.state.currentUser.id; } this.state.selectedEmployeeId = initialEmployeeId; if (this.ui.employeeSelectMobile?.length > 0) { this.ui.employeeSelectMobile.val(this.state.selectedEmployeeId).trigger('change.select2'); } if (this.ui.actionUserName) { this.ui.actionUserName.textContent = `Para: ${this.state.currentUser.id === this.state.selectedEmployeeId ? 'Você' : (this.state.employeeList.find(e => e.id === this.state.selectedEmployeeId)?.fullName || 'Desconhecido')}`; } await this.fetchAndUpdateStatus(); await this.fetchAndUpdateSummary(); }
@@ -267,7 +231,7 @@ class PontoApp {
   async loadAndDisplayAdminEmployeeList() { if (this.state.currentUser?.role !== 'admin') return; if (!this.ui.employeeListTableBody) { console.error("Admin table body missing."); return; } this.ui.employeeListTableBody.innerHTML = `<tr><td colspan="6" class="text-center"><span class="spinner-border spinner-border-sm"></span> Carregando...</td></tr>`; try { const response = await this.fetchWithAuth('/api/employees?active=all'); if (!response) return; const result = await response.json(); if (!response.ok || !result.success) throw new Error(result.message || `Erro ${response.status}`); this.state.employeeList = result.data; this.renderAdminEmployeeTable(); } catch (error) { if (error.message !== 'Não autorizado') { console.error("Error loading admin list:", error); this.ui.employeeListTableBody.innerHTML = `<tr><td colspan="6" class="text-center text-danger">Erro: ${error.message}</td></tr>`; } } }
   async handleDeleteRecord(recordId, employeeIdToRefresh) { console.log(`[Admin] Deleting record ID: ${recordId}`); if (!this.state.currentUser || this.state.currentUser.role !== 'admin') { this.showAlert('danger', 'Permissão negada.'); return; } try { const response = await this.fetchWithAuth(`/api/time-records/${recordId}`, { method: 'DELETE' }); if (!response) return; const result = await response.json(); if (!response.ok || !result.success) { throw new Error(result.message || `Erro ${response.status}`); } this.showAlert('success', 'Registro removido.'); if (this.ui.profileModalElement?.classList.contains('show')) { this.showProfileModal(employeeIdToRefresh); } if (this.state.currentView === 'admin') { this.loadAndDisplayAdminEmployeeList(); } if (this.state.currentView === 'dashboard' && this.state.selectedEmployeeId === employeeIdToRefresh) { this.fetchAndUpdateSummary(); } } catch (error) { if (error.message !== 'Não autorizado') { console.error(`Error deleting record ${recordId}:`, error); this.showAlert('danger', `Falha ao remover: ${error.message}`); } } }
   renderAdminEmployeeTable() { if (!this.ui.employeeListTableBody) return; if (this.state.employeeList.length === 0) { this.ui.employeeListTableBody.innerHTML = `<tr><td colspan="6" class="text-center text-muted">Nenhum funcionário.</td></tr>`; return; } this.ui.employeeListTableBody.innerHTML = this.state.employeeList.map(emp => `<tr><td><a href="#" class="link-primary view-profile" data-employee-id="${emp.id}">${emp.fullName || 'N/A'}</a></td><td>${emp.email || '-'}</td><td>${emp.role || '-'}</td><td><span class="badge bg-${emp.isActive ? 'success' : 'secondary'}">${emp.isActive ? 'Ativo' : 'Inativo'}</span></td><td>${parseFloat(emp.hourBalance || 0).toLocaleString('pt-BR', { style: 'decimal', minimumFractionDigits: 2, maximumFractionDigits: 2 })}h</td><td><div class="btn-group btn-group-sm">${/* Botões Ações */''}</div></td></tr>`).join(''); console.log("[AdminTable] Attaching listeners..."); this.ui.employeeListTableBody.querySelectorAll('.view-profile').forEach(btn => { btn.addEventListener('click', (e) => { e.preventDefault(); this.showProfileModal(parseInt(e.currentTarget.dataset.employeeId, 10)); }); }); this.ui.employeeListTableBody.querySelectorAll('tr').forEach((row, index) => { const emp = this.state.employeeList[index]; const actionsCell = row.querySelector('td:last-child .btn-group'); if (actionsCell) { actionsCell.innerHTML = `<button type="button" class="btn btn-outline-secondary view-profile-btn" title="Ver Perfil"><i class="fas fa-eye"></i></button><button type="button" class="btn btn-outline-primary edit-employee" title="Editar" data-bs-toggle="modal" data-bs-target="#employeeFormModal" data-employee-id="${emp.id}"><i class="fas fa-edit"></i></button><button type="button" class="btn ${emp.isActive ? 'btn-outline-danger' : 'btn-outline-success'} toggle-status" title="${emp.isActive ? 'Desativar' : 'Ativar'}" data-current-status="${emp.isActive}"><i class="fas fa-power-off"></i></button>`; actionsCell.querySelector('.view-profile-btn').addEventListener('click', () => this.showProfileModal(emp.id)); actionsCell.querySelector('.toggle-status').addEventListener('click', async () => { const newStatus = !emp.isActive; const actionText = newStatus ? 'ativar' : 'desativar'; if (!confirm(`Confirmar ${actionText} ${emp.fullName}?`)) return; try { const response = await this.fetchWithAuth(`/api/employees/${emp.id}/status`, { method: 'PATCH', body: JSON.stringify({ isActive: newStatus }) }); if (!response) return; const result = await response.json(); if (!response.ok || !result.success) throw new Error(result.message || `Erro ${response.status}`); this.showAlert('success', `Funcionário ${actionText}do.`); this.loadAndDisplayAdminEmployeeList(); } catch (error) { if (error.message !== 'Não autorizado') this.showAlert('danger', `Erro ao ${actionText}: ${error.message}`); } }); } }); }
-  prepareEmployeeForm(employeeId = null) { const employeeFormModal = this.ui.employeeFormModal; if (!employeeFormModal) { console.error("Modal form func. não init."); return; } this._setupAllModalEventListeners(); if (!this.ui.employeeForm || !this.ui.employeeFormModalLabel || !this.ui.btnSaveChangesEmployee || !this.ui.passwordFieldContainer || !this.ui.employeePassword || !this.ui.passwordHelp || !this.ui.employeeEmail || !this.ui.employeeFormError) { console.error("Elementos form func. não encontrados."); return; } this.ui.employeeForm.reset(); this.ui.employeeForm.classList.remove('was-validated'); this.ui.employeeFormError.style.display = 'none'; this.ui.employeeId.value = employeeId || ''; if (employeeId) { /* ... (modo edição) ... */ this.ui.employeeFormModalLabel.textContent = "Editar Funcionário"; this.ui.btnSaveChangesEmployee.textContent = "Salvar Alterações"; this.ui.passwordFieldContainer.style.display = 'block'; this.ui.employeePassword.required = false; this.ui.passwordHelp.textContent = 'Deixe em branco para não alterar.'; this.ui.employeeEmail.disabled = true; const employee = this.state.employeeList.find(emp => emp.id === employeeId); if (employee) { Object.keys(employee).forEach(key => { const input = this.ui.employeeForm.elements[key]; if (input) { if (input.type === 'date') input.value = this.formatDateISO(employee[key]); else input.value = employee[key]; } }); } } else { /* ... (modo cadastro) ... */ this.ui.employeeFormModalLabel.textContent = "Cadastrar Funcionário"; this.ui.btnSaveChangesEmployee.textContent = "Cadastrar Funcionário"; this.ui.passwordFieldContainer.style.display = 'block'; this.ui.employeePassword.required = true; this.ui.passwordHelp.textContent = 'Mínimo 6 caracteres.'; this.ui.employeeEmail.disabled = false; } }
+  prepareEmployeeForm(employeeId = null) { const employeeFormModal = this.ui.employeeFormModal; if (!employeeFormModal) { console.error("Modal form func. não init."); return; } this._setupAllModalEventListeners(); if (!this.ui.employeeForm || !this.ui.employeeFormModalLabel || !this.ui.btnSaveChangesEmployee || !this.ui.passwordFieldContainer || !this.ui.employeePassword || !this.ui.passwordHelp || !this.ui.employeeEmail || !this.ui.employeeFormError) { console.error("Elementos form func. não encontrados."); return; } this.ui.employeeForm.reset(); this.ui.employeeForm.classList.remove('was-validated'); this.ui.employeeFormError.style.display = 'none'; this.ui.employeeId.value = employeeId || ''; if (employeeId) { this.ui.employeeFormModalLabel.textContent = "Editar Funcionário"; this.ui.btnSaveChangesEmployee.textContent = "Salvar Alterações"; this.ui.passwordFieldContainer.style.display = 'block'; this.ui.employeePassword.required = false; this.ui.passwordHelp.textContent = 'Deixe em branco para não alterar.'; this.ui.employeeEmail.disabled = true; const employee = this.state.employeeList.find(emp => emp.id === employeeId); if (employee) { Object.keys(employee).forEach(key => { const input = this.ui.employeeForm.elements[key]; if (input) { if (input.type === 'date') input.value = this.formatDateISO(employee[key]); else input.value = employee[key]; } }); } } else { this.ui.employeeFormModalLabel.textContent = "Cadastrar Novo Funcionário"; this.ui.btnSaveChangesEmployee.textContent = "Cadastrar Funcionário"; this.ui.passwordFieldContainer.style.display = 'block'; this.ui.employeePassword.required = true; this.ui.passwordHelp.textContent = 'Mínimo 6 caracteres.'; this.ui.employeeEmail.disabled = false; } }
   async handleSaveEmployeeForm() { const employeeFormModal = this.ui.employeeFormModal; if (!employeeFormModal) { console.error("Modal form func. não init."); return; } this._setupAllModalEventListeners(); if (!this._validateEmployeeForm()) { if (this.ui.employeeFormError) { this.ui.employeeFormError.textContent = 'Corrija os campos inválidos.'; this.ui.employeeFormError.style.display = 'block'; } return; } if (this.ui.employeeFormError) this.ui.employeeFormError.style.display = 'none'; const employeeId = this.ui.employeeId.value; const isEditing = !!employeeId; const formData = new FormData(this.ui.employeeForm); const data = Object.fromEntries(formData.entries()); if (isEditing && !data.password) { delete data.password; } if (!data.birthDate) { delete data.birthDate; } else { data.birthDate = this.formatDateISO(new Date(data.birthDate + 'T00:00:00')); } if (!data.hireDate) { delete data.hireDate; } else { data.hireDate = this.formatDateISO(new Date(data.hireDate + 'T00:00:00')); } if (!data.photoUrl) delete data.photoUrl; const url = isEditing ? `/api/employees/${employeeId}` : '/api/employees'; const method = isEditing ? 'PUT' : 'POST'; console.log(`Salvando (${method}):`, data); if (!this.ui.btnSaveChangesEmployee) { console.error("Botão Salvar não encontrado."); return; } this.ui.btnSaveChangesEmployee.disabled = true; this.ui.btnSaveChangesEmployee.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Salvando...'; try { if (isEditing) delete data.email; delete data.id; const response = await this.fetchWithAuth(url, { method: method, body: JSON.stringify(data) }); if (!response) return; const result = await response.json(); if (!response.ok || !result.success) { const fieldError = result.error?.field ? ` (Campo: ${result.error.field})` : ''; throw new Error((result.message || `Erro ${response.status}`) + fieldError); } this.showAlert('success', `Funcionário ${isEditing ? 'atualizado' : 'cadastrado'}!`); if (this.ui.employeeFormModal) this.ui.employeeFormModal.hide(); else console.warn("employeeFormModal instance unavailable."); if (this.state.currentView === 'admin') { this.loadAndDisplayAdminEmployeeList(); } } catch (error) { if (error.message !== 'Não autorizado') { console.error("Erro salvar func:", error); if (this.ui.employeeFormError) { this.ui.employeeFormError.textContent = `Erro: ${error.message}`; this.ui.employeeFormError.style.display = 'block'; } } } finally { if (this.ui.btnSaveChangesEmployee) { this.ui.btnSaveChangesEmployee.disabled = false; this.ui.btnSaveChangesEmployee.innerHTML = isEditing ? 'Salvar Alterações' : 'Cadastrar Funcionário'; } } }
   _validateEmployeeForm() { const form = this.ui.employeeForm; if (!form) return false; form.classList.add('was-validated'); let isValid = form.checkValidity(); if (!this.ui.employeeId?.value && !this.ui.employeePassword?.value) { if (this.ui.employeePassword) { this.ui.employeePassword.classList.add('is-invalid'); this.ui.employeePassword.setCustomValidity("Senha obrigatória."); } isValid = false; } else { if (this.ui.employeePassword) { this.ui.employeePassword.setCustomValidity(""); if (!this.ui.employeeId?.value && this.ui.employeePassword.value && !this.ui.employeePassword.checkValidity()) { isValid = false; } else if (this.ui.employeeId?.value && this.ui.employeePassword.value && !this.ui.employeePassword.checkValidity()) { isValid = false; } else { if (this.ui.employeePassword.value === '' || this.ui.employeePassword.checkValidity()) { this.ui.employeePassword.classList.remove('is-invalid'); } } } } return isValid; }
   async fetchWithAuth(url, options = {}) { console.log(`fetchWithAuth: ${options.method || 'GET'} ${url}`); const headers = { 'Content-Type': 'application/json', ...options.headers }; if (this.state.token) { headers['Authorization'] = `Bearer ${this.state.token}`; } else { console.warn("fetchWithAuth chamado sem token."); } try { const response = await fetch(url, { ...options, headers }); if (response.status === 401) { console.error("fetchWithAuth: Erro 401 - Não autorizado. Deslogando..."); this.showAlert('danger', 'Sessão inválida ou expirada. Faça login novamente.'); this.handleLogout(); return Promise.reject(new Error('Não autorizado')); } return response; } catch (networkError) { console.error(`fetchWithAuth: Erro de rede ou fetch para ${url}:`, networkError); this.showAlert('danger', `Erro de conexão ao tentar acessar a API. Verifique sua rede.`); return Promise.reject(networkError); } }
