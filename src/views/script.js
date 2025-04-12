@@ -87,15 +87,25 @@ class PontoApp {
       if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
         try {
           this.ui[modalName] = new bootstrap.Modal(element);
-          console.log(`[Modal] Instância para ${modalName} criada com sucesso.`);
-          // Adiciona listener de limpeza UMA VEZ quando a instância é criada
+          // Adiciona listener para limpar erros/forms quando o modal é FECHADO
           element.addEventListener('hidden.bs.modal', () => {
             console.log(`[Modal] ${modalName} fechado (hidden.bs.modal). Cleaning up...`);
-            const form = element.querySelector('form'); // Busca qualquer form dentro
-            form?.reset(); // Reseta o form se existir
-            form?.classList.remove('was-validated'); // Remove validação visual
-            element.querySelector('.alert-danger')?.style.display = 'none'; // Esconde erro
-          }, { once: false }); // Listener persiste para limpezas futuras
+            // --- CORREÇÃO APLICADA AQUI ---
+            const loginErrorElement = element.querySelector('#loginError');
+            if (loginErrorElement) loginErrorElement.style.display = 'none';
+            const loginFormElement = element.querySelector('#loginForm');
+            if (loginFormElement) loginFormElement.reset(); // Verifica antes de chamar reset
+
+            const employeeFormElement = element.querySelector('#employeeForm');
+            if (employeeFormElement) {
+              employeeFormElement.reset();
+              employeeFormElement.classList.remove('was-validated');
+            }
+            const employeeFormErrorElement = element.querySelector('#employeeFormError');
+            if (employeeFormErrorElement) employeeFormErrorElement.style.display = 'none';
+            // --- FIM DA CORREÇÃO ---
+          });
+          console.log(`[Modal] Instância para ${modalName} criada com sucesso.`);
         } catch (error) { console.error(`[Modal] Erro ao criar instância para ${modalName}:`, error); return null; }
       } else { console.error(`[Modal] Bootstrap indisponível para criar ${modalName}.`); return null; }
     }
