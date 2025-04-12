@@ -315,14 +315,21 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body" id="profileModalBody">
-                    <div class="text-center p-5"><span class="spinner-border spinner-border-sm"></span> Carregando...
+                    <!-- Conteúdo será carregado dinamicamente -->
+                    <div class="text-center p-5">
+                        <span class="spinner-border spinner-border-lg"></span>
+                        <p class="mt-2">Carregando...</p>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <div id="profileAdminActions" style="display: none;"><button type="button"
-                            class="btn btn-warning btn-sm" id="btnEditProfile"><i class="fas fa-edit me-1"></i> Editar
-                            Perfil</button><button type="button" class="btn btn-danger btn-sm"
-                            id="btnToggleActiveStatus"><i class="fas fa-power-off me-1"></i> Desativar</button></div>
+                    <div id="profileAdminActions" style="display: none;">
+                        <button type="button" class="btn btn-warning me-2" id="btnEditProfile">
+                            <i class="fas fa-edit me-1"></i> Editar Perfil
+                        </button>
+                        <button type="button" class="btn btn-danger" id="btnToggleActiveStatus">
+                            <i class="fas fa-power-off me-1"></i> Desativar
+                        </button>
+                    </div>
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
                 </div>
             </div>

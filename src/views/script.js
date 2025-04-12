@@ -274,31 +274,138 @@ class PontoApp {
     }
   }
 
+  /**
+   * Mostra o modal de perfil do funcionário
+   */
   async showProfileModal(employeeId) {
-    console.log(`[ProfileModal] Attempting show for ID: ${employeeId}`); if (!employeeId) { console.warn("showProfileModal: employeeId missing."); return; }
-    const profileModalInstance = this._ensureModalInstance('profileModal'); // Garante/Cria instância
-    if (!profileModalInstance) { console.error("Profile Modal could not be initialized."); this.showAlert('danger', 'Erro perfil.'); return; }
-    this.state.viewingEmployeeId = employeeId;
-    // Configura estado inicial do modal
-    if (this.ui.profileModalLabel) this.ui.profileModalLabel.textContent = "Carregando...";
-    if (this.ui.profileModalBody) this.ui.profileModalBody.innerHTML = `<div class="text-center p-5"><span class="spinner-border"></span></div>`;
-    if (this.ui.profileAdminActions) this.ui.profileAdminActions.style.display = 'none';
-    // Garante listeners internos (embora _setupAllModalEventListeners já deva ter feito)
-    this._setupAllModalEventListeners();
+    console.log(`[ProfileModal] Abrindo perfil para ID: ${employeeId}`);
 
-    console.log("[ProfileModal] Calling .show()"); try { profileModalInstance.show(); } catch (e) { console.error("Error calling .show():", e); this.showAlert('danger', 'Erro abrir perfil.'); return; }
-    // Carrega os dados DEPOIS que o modal começa a abrir
-    await this._loadProfileData(employeeId);
+    if (!employeeId) {
+      console.warn("[ProfileModal] ID do funcionário não fornecido");
+      this.showAlert('danger', 'ID do funcionário inválido');
+      return;
+    }
+
+    // Garante que a instância do modal existe
+    const profileModalInstance = this._ensureModalInstance('profileModal');
+    if (!profileModalInstance) {
+      console.error("[ProfileModal] Não foi possível inicializar o modal");
+      this.showAlert('danger', 'Erro ao abrir perfil');
+      return;
+    }
+
+    // Configura o estado inicial
+    this.state.viewingEmployeeId = employeeId;
+
+    // Busca os elementos internos do modal
+    const modalElement = this.ui.profileModalElement;
+    if (!modalElement) {
+      console.error("[ProfileModal] Elemento do modal não encontrado");
+      return;
+    }
+
+    // Configura elementos internos
+    const modalLabel = modalElement.querySelector('#profileModalLabel');
+    const modalBody = modalElement.querySelector('#profileModalBody');
+    const adminActions = modalElement.querySelector('#profileAdminActions');
+
+    if (!modalLabel || !modalBody) {
+      console.error("[ProfileModal] Elementos internos não encontrados");
+      this.showAlert('danger', 'Erro ao configurar perfil');
+      return;
+    }
+
+    // Estado inicial do modal
+    modalLabel.textContent = "Carregando perfil...";
+    modalBody.innerHTML = `
+      <div class="text-center p-5">
+          <span class="spinner-border spinner-border-lg"></span>
+          <p class="mt-2">Carregando dados do funcionário...</p>
+      </div>
+  `;
+
+    if (adminActions) {
+      adminActions.style.display = 'none';
+    }
+
+    try {
+      console.log("[ProfileModal] Exibindo modal...");
+      profileModalInstance.show();
+
+      // Carrega os dados após abrir o modal
+      await this._loadProfileData(employeeId);
+    } catch (error) {
+      console.error("[ProfileModal] Erro ao abrir modal:", error);
+      modalBody.innerHTML = `
+          <div class="alert alert-danger m-3">
+              Erro ao carregar perfil: ${error.message}
+          </div>
+      `;
+    }
   }
 
   // ================ LÓGICA RESTANTE (PRESERVADA) ================
 
+  /**
+   * Carrega os dados do perfil
+   */
   async _loadProfileData(employeeId) {
+    console.log(`[ProfileModal] Carregando dados para ID: ${employeeId}`);
+
+    const modalElement = this.ui.profileModalElement;
+    if (!modalElement) return;
+
+    const modalBody = modalElement.querySelector('#profileModalBody');
+    const adminActions = modalElement.querySelector('#profileAdminActions');
+
     try {
-      const empResponse = await this.fetchWithAuth(`/api/employees/${employeeId}`); if (!empResponse) return; const empResult = await empResponse.json(); if (!empResponse.ok || !empResult.success) throw new Error(`Erro Perfil: ${empResult.message || empResponse.statusText}`); const employee = empResult.data; if (!employee) throw new Error("Dados funcionário API vazios.");
-      const endDate = new Date(); const startDate = new Date(); startDate.setDate(endDate.getDate() - 7); const histUrl = `/api/time-records/employee/${employeeId}/balance-history?startDate=${this.formatDateISO(startDate)}&endDate=${this.formatDateISO(endDate)}`; const histResponse = await this.fetchWithAuth(histUrl); let history = []; if (histResponse) { const histResult = await histResponse.json(); if (histResponse.ok && histResult.success) { history = histResult.data; } else { console.warn(`Falha histórico saldo: ${histResult?.message}`); } }
-      this.renderProfileModalContent(employee, history); // Renderiza com os dados
-    } catch (error) { if (error.message !== 'Não autorizado') { console.error("Erro carregar dados perfil:", error); if (this.ui.profileModalBody) { this.ui.profileModalBody.innerHTML = `<div class="alert alert-danger m-3">Erro: ${error.message}</div>`; } } }
+      // 1. Busca dados básicos do funcionário
+      const empResponse = await this.fetchWithAuth(`/api/employees/${employeeId}`);
+
+      if (!empResponse || !empResponse.ok) {
+        throw new Error(empResponse?.statusText || 'Falha na requisição');
+      }
+
+      const empResult = await empResponse.json();
+      if (!empResult.success) {
+        throw new Error(empResult.message || 'Erro ao obter dados');
+      }
+
+      const employee = empResult.data;
+      if (!employee) {
+        throw new Error("Dados do funcionário não encontrados");
+      }
+
+      // 2. Busca histórico (últimos 7 dias)
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setDate(endDate.getDate() - 7);
+
+      const histUrl = `/api/time-records/employee/${employeeId}/balance-history?startDate=${this.formatDateISO(startDate)}&endDate=${this.formatDateISO(endDate)}`;
+      const histResponse = await this.fetchWithAuth(histUrl);
+
+      let history = [];
+      if (histResponse && histResponse.ok) {
+        const histResult = await histResponse.json();
+        if (histResult.success) {
+          history = histResult.data || [];
+        }
+      }
+
+      // 3. Renderiza o conteúdo
+      this.renderProfileModalContent(employee, history);
+
+    } catch (error) {
+      console.error("[ProfileModal] Erro ao carregar dados:", error);
+
+      if (modalBody) {
+        modalBody.innerHTML = `
+              <div class="alert alert-danger m-3">
+                  Erro ao carregar perfil: ${error.message}
+              </div>
+          `;
+      }
+    }
   }
 
   _initSelect2() { const targetSelect = this.ui.employeeSelectMobile; if (targetSelect && targetSelect.length > 0 && typeof $.fn.select2 === 'function') { try { targetSelect.select2({ placeholder: "Visualizar outro...", allowClear: true, width: '100%', dropdownParent: targetSelect.parent() }); targetSelect.prop('disabled', true); console.log("Select2 initialized for mobile."); } catch (error) { console.error("Erro ao inicializar Select2:", error); this.showAlert('warning', 'Erro seletor func.') } } else if (!(typeof $.fn.select2 === 'function')) { console.error("Select2 function not available."); } else { console.error("Select2 element (mobile) not found."); } }
@@ -394,7 +501,156 @@ class PontoApp {
   }
 
   async showProfileModal(employeeId) { console.log(`[ProfileModal] Attempting show for ID: ${employeeId}`); if (!employeeId) { console.warn("showProfileModal: employeeId missing."); return; } const profileModalInstance = this._ensureModalInstance('profileModal'); if (!profileModalInstance) { console.error("Profile Modal could not be initialized."); this.showAlert('danger', 'Erro perfil.'); return; } this.state.viewingEmployeeId = employeeId; if (this.ui.profileModalLabel) this.ui.profileModalLabel.textContent = "Carregando..."; if (this.ui.profileModalBody) this.ui.profileModalBody.innerHTML = `<div class="text-center p-5"><span class="spinner-border"></span></div>`; if (this.ui.profileAdminActions) this.ui.profileAdminActions.style.display = 'none'; this._setupAllModalEventListeners(); console.log("[ProfileModal] Calling .show()"); try { profileModalInstance.show(); } catch (e) { console.error("Error calling .show():", e); this.showAlert('danger', 'Erro abrir perfil.'); return; } await this._loadProfileData(employeeId); }
-  renderProfileModalContent(employee, history) { if (!this.ui.profileModalLabel || !this.ui.profileModalBody || !this.ui.profileAdminActions) { console.error("Profile modal inner elements missing."); return; } this.ui.profileModalLabel.textContent = `Perfil de ${employee.fullName}`; let age = 'N/A'; if (employee.birthDate) { try { const bd = new Date(employee.birthDate); const today = new Date(); age = today.getFullYear() - bd.getFullYear(); const m = today.getMonth() - bd.getMonth(); if (m < 0 || (m === 0 && today.getDate() < bd.getDate())) { age--; } } catch { age = 'Inválida'; } } const balance = parseFloat(employee.hourBalance || 0); const fb = balance.toLocaleString('pt-BR', { style: 'decimal', minimumFractionDigits: 2, maximumFractionDigits: 2 }); let bt = fb + "h"; let bc = 'balance-zero'; if (balance > 0.01) { bt = "+" + bt; bc = 'balance-positive'; } else if (balance < -0.01) { bc = 'balance-negative'; } let historyHtml = '<p class="text-muted text-center small my-3">Nenhum registro finalizado nos últimos 7 dias.</p>'; if (history && history.length > 0) { historyHtml = `<table class="table table-sm table-striped" id="balanceHistoryTable"><thead><tr><th>Data</th><th>Trab.</th><th>Meta</th><th>Saldo</th><th></th></tr></thead><tbody>${history.map(h => `<tr><td>${new Date(h.date).toLocaleDateString('pt-BR')}</td><td>${h.workedHours}h</td><td>${h.dailyGoal}h</td><td class="${parseFloat(h.dailyBalance) > 0.01 ? 'balance-positive' : (parseFloat(h.dailyBalance) < -0.01 ? 'balance-negative' : '')}">${parseFloat(h.dailyBalance) > 0 ? '+' : ''}${h.dailyBalance}h</td><td>${this.state.currentUser?.role === 'admin' ? `<button class="btn btn-outline-danger btn-sm delete-record-btn" data-record-id="${h.id}" title="Remover"><i class="fas fa-trash-alt"></i></button>` : ''}</td></tr>`).join('')}</tbody></table>`; } this.ui.profileModalBody.innerHTML = `<div class="row mb-4"><div class="col-md-4 text-center"><img src="${employee.photoUrl || 'assets/default-avatar.png'}" alt="Foto" class="img-fluid profile-photo mb-2" onerror="this.onerror=null; this.src='assets/default-avatar.png';"><span class="badge bg-${employee.isActive ? 'success' : 'danger'}">${employee.isActive ? 'Ativo' : 'Inativo'}</span></div><div class="col-md-8"><h4>${employee.fullName}</h4><p class="text-muted mb-1">${employee.role}</p><p><i class="fas fa-envelope fa-fw me-2"></i>${employee.email}</p><p><i class="fas fa-birthday-cake fa-fw me-2"></i>${age} anos ${employee.birthDate ? '(' + new Date(employee.birthDate).toLocaleDateString('pt-BR') + ')' : ''}</p><p><i class="fas fa-calendar-alt fa-fw me-2"></i>Admissão: ${employee.hireDate ? new Date(employee.hireDate).toLocaleDateString('pt-BR') : 'N/A'}</p><p><i class="fas fa-briefcase fa-fw me-2"></i>Carga: ${employee.weeklyHours}h/sem</p><hr><p class="mb-1"><strong>Saldo Banco de Horas:</strong></p><h3 class="fw-bold ${bc}">${bt}</h3></div></div><h5>Histórico Recente (7 dias)</h5>${historyHtml}`; if (this.state.currentUser?.role === 'admin') { this.ui.profileAdminActions.style.display = 'block'; const btnToggle = this.ui.profileAdminActions.querySelector('#btnToggleActiveStatus'); if (btnToggle) { if (employee.isActive) { btnToggle.innerHTML = '<i class="fas fa-power-off me-1"></i> Desativar'; btnToggle.classList.remove('btn-success'); btnToggle.classList.add('btn-danger'); } else { btnToggle.innerHTML = '<i class="fas fa-power-off me-1"></i> Ativar'; btnToggle.classList.remove('btn-danger'); btnToggle.classList.add('btn-success'); } } else { console.error("Btn Toggle Status missing."); } } else { if (this.ui.profileAdminActions) this.ui.profileAdminActions.style.display = 'none'; } this.ui.profileModalBody.querySelectorAll('.delete-record-btn').forEach(btn => { if (btn.onclick) { btn.onclick = null; } btn.addEventListener('click', async (e) => { const recordId = e.currentTarget.dataset.recordId; const employeeName = employee.fullName; if (confirm(`Remover registro #${recordId} de ${employeeName}?`)) { await this.handleDeleteRecord(recordId, employee.id); } }); }); }
+  renderProfileModalContent(employee, history = []) {
+    console.log("[ProfileModal] Renderizando conteúdo...");
+
+    const modalElement = this.ui.profileModalElement;
+    if (!modalElement) return;
+
+    const modalLabel = modalElement.querySelector('#profileModalLabel');
+    const modalBody = modalElement.querySelector('#profileModalBody');
+    const adminActions = modalElement.querySelector('#profileAdminActions');
+
+    if (!modalLabel || !modalBody) {
+      console.error("[ProfileModal] Elementos para renderização não encontrados");
+      return;
+    }
+
+    try {
+      // Calcula idade
+      let age = 'N/A';
+      if (employee.birthDate) {
+        try {
+          const birthDate = new Date(employee.birthDate);
+          const today = new Date();
+          age = today.getFullYear() - birthDate.getFullYear();
+          if (today.getMonth() < birthDate.getMonth() ||
+            (today.getMonth() === birthDate.getMonth() && today.getDate() < birthDate.getDate())) {
+            age--;
+          }
+        } catch {
+          age = 'Inválida';
+        }
+      }
+
+      // Formata saldo
+      const balance = parseFloat(employee.hourBalance || 0);
+      const formattedBalance = balance.toLocaleString('pt-BR', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      });
+
+      let balanceText = `${formattedBalance}h`;
+      let balanceClass = 'balance-zero';
+
+      if (balance > 0.01) {
+        balanceText = `+${balanceText}`;
+        balanceClass = 'balance-positive';
+      } else if (balance < -0.01) {
+        balanceClass = 'balance-negative';
+      }
+
+      // Prepara histórico
+      let historyHtml = `
+            <p class="text-muted text-center small my-3">
+                Nenhum registro finalizado nos últimos 7 dias.
+            </p>
+        `;
+
+      if (history.length > 0) {
+        historyHtml = `
+                <table class="table table-sm table-striped">
+                    <thead>
+                        <tr>
+                            <th>Data</th>
+                            <th>Trabalhado</th>
+                            <th>Meta</th>
+                            <th>Saldo</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${history.map(h => `
+                            <tr>
+                                <td>${new Date(h.date).toLocaleDateString('pt-BR')}</td>
+                                <td>${h.workedHours}h</td>
+                                <td>${h.dailyGoal}h</td>
+                                <td class="${h.dailyBalance > 0 ? 'balance-positive' : (h.dailyBalance < 0 ? 'balance-negative' : '')}">
+                                    ${h.dailyBalance > 0 ? '+' : ''}${h.dailyBalance}h
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+      }
+
+      // Monta o HTML completo
+      modalLabel.textContent = `Perfil de ${employee.fullName}`;
+      modalBody.innerHTML = `
+            <div class="row mb-4">
+                <div class="col-md-4 text-center">
+                    <img src="${employee.photoUrl || 'assets/default-avatar.png'}" 
+                         alt="Foto" 
+                         class="img-fluid rounded-circle mb-3" 
+                         style="max-width: 150px;"
+                         onerror="this.src='assets/default-avatar.png'">
+                    <span class="badge bg-${employee.isActive ? 'success' : 'danger'}">
+                        ${employee.isActive ? 'Ativo' : 'Inativo'}
+                    </span>
+                </div>
+                <div class="col-md-8">
+                    <h3>${employee.fullName}</h3>
+                    <p class="text-muted">${employee.role}</p>
+                    
+                    <div class="mb-3">
+                        <p><i class="fas fa-envelope me-2"></i> ${employee.email}</p>
+                        <p><i class="fas fa-birthday-cake me-2"></i> ${age} anos</p>
+                        <p><i class="fas fa-calendar-alt me-2"></i> Admitido em: ${employee.hireDate ? new Date(employee.hireDate).toLocaleDateString('pt-BR') : 'N/A'}</p>
+                        <p><i class="fas fa-clock me-2"></i> Carga horária: ${employee.weeklyHours}h/semana</p>
+                    </div>
+                    
+                    <hr>
+                    
+                    <div class="mb-4">
+                        <h5>Saldo Banco de Horas</h5>
+                        <h2 class="${balanceClass}">${balanceText}</h2>
+                    </div>
+                </div>
+            </div>
+            
+            <h5>Histórico Recente</h5>
+            ${historyHtml}
+        `;
+
+      // Configura ações administrativas se for admin
+      if (adminActions && this.state.currentUser?.role === 'admin') {
+        adminActions.style.display = 'block';
+        const toggleBtn = adminActions.querySelector('#btnToggleActiveStatus');
+
+        if (toggleBtn) {
+          if (employee.isActive) {
+            toggleBtn.innerHTML = '<i class="fas fa-power-off me-1"></i> Desativar';
+            toggleBtn.classList.remove('btn-success');
+            toggleBtn.classList.add('btn-danger');
+          } else {
+            toggleBtn.innerHTML = '<i class="fas fa-power-off me-1"></i> Ativar';
+            toggleBtn.classList.remove('btn-danger');
+            toggleBtn.classList.add('btn-success');
+          }
+        }
+      } else if (adminActions) {
+        adminActions.style.display = 'none';
+      }
+
+    } catch (error) {
+      console.error("[ProfileModal] Erro ao renderizar:", error);
+      modalBody.innerHTML = `
+            <div class="alert alert-danger">
+                Erro ao exibir perfil: ${error.message}
+            </div>
+        `;
+    }
+  }
   async _loadProfileData(employeeId) { try { const empResponse = await this.fetchWithAuth(`/api/employees/${employeeId}`); if (!empResponse) return; const empResult = await empResponse.json(); if (!empResponse.ok || !empResult.success) throw new Error(`Erro Perfil: ${empResult.message || empResponse.statusText}`); const employee = empResult.data; if (!employee) throw new Error("Dados funcionário API vazios."); const endDate = new Date(); const startDate = new Date(); startDate.setDate(endDate.getDate() - 7); const histUrl = `/api/time-records/employee/${employeeId}/balance-history?startDate=${this.formatDateISO(startDate)}&endDate=${this.formatDateISO(endDate)}`; const histResponse = await this.fetchWithAuth(histUrl); let history = []; if (histResponse) { const histResult = await histResponse.json(); if (histResponse.ok && histResult.success) { history = histResult.data; } else { console.warn(`Falha histórico saldo: ${histResult?.message}`); } } this.renderProfileModalContent(employee, history); } catch (error) { if (error.message !== 'Não autorizado') { console.error("Erro carregar dados perfil:", error); if (this.ui.profileModalBody) { this.ui.profileModalBody.innerHTML = `<div class="alert alert-danger m-3">Erro: ${error.message}</div>`; } } } }
   editProfileFromModal() { if (!this.state.viewingEmployeeId) return; const profileModal = this.ui.profileModal; const employeeFormModal = this.ui.employeeFormModal; if (!profileModal || !employeeFormModal) { console.error("Modal instances missing."); this.showAlert('danger', 'Erro ao editar.'); return; } profileModal.hide(); const editButton = document.createElement('button'); editButton.dataset.employeeId = this.state.viewingEmployeeId; setTimeout(() => { employeeFormModal.show(editButton); }, 200); }
   async toggleActiveStatusFromModal() { const employeeId = this.state.viewingEmployeeId; if (!employeeId || this.state.currentUser?.role !== 'admin') return; const profileStatusBadge = this.ui.profileModalBody?.querySelector('.badge'); const currentIsActive = profileStatusBadge?.classList.contains('bg-success'); const newStatus = !currentIsActive; const actionText = newStatus ? 'ativar' : 'desativar'; if (!confirm(`Confirmar ${actionText} ${employeeId}?`)) return; try { const response = await this.fetchWithAuth(`/api/employees/${employeeId}/status`, { method: 'PATCH', body: JSON.stringify({ isActive: newStatus }) }); if (!response) return; const result = await response.json(); if (!response.ok || !result.success) throw new Error(result.message || `Erro ${response.status}`); this.showAlert('success', `Funcionário ${actionText}do.`); this.showProfileModal(employeeId); if (this.state.currentView === 'admin') { this.loadAndDisplayAdminEmployeeList(); } } catch (error) { if (error.message !== 'Não autorizado') { console.error(`Erro ${actionText}:`, error); this.showAlert('danger', `Falha ${actionText}: ${error.message}`); } } }
