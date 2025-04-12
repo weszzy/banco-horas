@@ -351,6 +351,8 @@ class PontoApp {
    */
   async _loadProfileData(employeeId) {
     console.log(`[ProfileModal] Carregando dados para ID: ${employeeId}`);
+    console.log("Resposta da API /employees:", empResponse, await empResponse.json());
+    console.log("Resposta da API /balance-history:", histResponse, histResponse ? await histResponse.json() : null);
 
     const modalElement = this.ui.profileModalElement;
     if (!modalElement) return;
