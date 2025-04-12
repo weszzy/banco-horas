@@ -5,35 +5,33 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Controle de Ponto | Empresa XYZ</title>
+
     <!-- CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="style.css"> <!-- Seu CSS customizado -->
+    <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
-    <!-- Navbar Fixa no Topo -->
+    <!-- Navbar -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark sticky-top shadow-sm">
         <div class="container-fluid">
             <a class="navbar-brand" href="#">
                 <img src="assets/company-logo.png" alt="Logo" width="30" height="30"
                     class="d-inline-block align-top me-2" onerror="this.style.display='none'"> Banco de Horas
             </a>
-            <!-- Botão Toggler que abre o Offcanvas (visível apenas em telas menores por padrão do Bootstrap) -->
             <button class="navbar-toggler" type="button" data-bs-toggle="offcanvas" data-bs-target="#mainOffcanvas"
                 aria-controls="mainOffcanvas" aria-label="Toggle navigation">
                 <span class="navbar-toggler-icon"></span>
             </button>
-            <!-- Área de Login/Logout -->
             <div class="ms-auto" id="authArea">
-                <!-- BOTÃO LOGIN NAVBAR: Removido data-bs-*, Adicionado ID -->
                 <button class="btn btn-primary btn-sm" id="btnLoginTrigger">Login</button>
             </div>
         </div>
     </nav>
 
-    <!-- Offcanvas Menu Lateral -->
+    <!-- Offcanvas Menu -->
     <div class="offcanvas offcanvas-start bg-dark text-white" tabindex="-1" id="mainOffcanvas"
         aria-labelledby="mainOffcanvasLabel">
         <div class="offcanvas-header border-bottom border-secondary">
@@ -43,41 +41,39 @@
         </div>
         <div class="offcanvas-body">
             <ul class="navbar-nav">
-                <!-- Links Comuns -->
                 <li class="nav-item" id="navLinksOffcanvas" style="display: none;">
-                    <a class="nav-link" href="#" id="linkMeuPerfilOffcanvas"><i class="fas fa-user fa-fw me-2"></i>Meu
-                        Perfil</a>
+                    <a class="nav-link" href="#" id="linkMeuPerfilOffcanvas">
+                        <i class="fas fa-user fa-fw me-2"></i>Meu Perfil
+                    </a>
                 </li>
-                <hr class="text-secondary nav-separator" style="display: none;"> <!-- Separador visual -->
-                <!-- Links Admin -->
+                <hr class="text-secondary nav-separator" style="display: none;">
                 <li class="nav-item" id="navAdminLinksOffcanvas" style="display: none;">
-                    <a class="nav-link" href="#" id="linkGerenciarFuncionariosOffcanvas"><i
-                            class="fas fa-users-cog fa-fw me-2"></i>Gerenciar Funcionários</a>
-                    <!-- LINK NOVO FUNC OFFCANVAS: Removido data-bs-*, ID Mantido -->
-                    <a class="nav-link" href="#" id="linkNovoFuncionarioOffcanvas"><i
-                            class="fas fa-user-plus fa-fw me-2"></i>Novo
-                        Funcionário</a>
+                    <a class="nav-link" href="#" id="linkGerenciarFuncionariosOffcanvas">
+                        <i class="fas fa-users-cog fa-fw me-2"></i>Gerenciar Funcionários
+                    </a>
+                    <a class="nav-link" href="#" id="linkNovoFuncionarioOffcanvas">
+                        <i class="fas fa-user-plus fa-fw me-2"></i>Novo Funcionário
+                    </a>
                 </li>
                 <hr class="text-secondary" id="navAdminSeparatorOffcanvas" style="display: none;">
-                <!-- Logout -->
                 <li class="nav-item" id="navLogoutOffcanvas" style="display: none;">
-                    <a class="nav-link" href="#" id="btnLogoutOffcanvas"><i
-                            class="fas fa-sign-out-alt fa-fw me-2"></i>Sair</a>
+                    <a class="nav-link" href="#" id="btnLogoutOffcanvas">
+                        <i class="fas fa-sign-out-alt fa-fw me-2"></i>Sair
+                    </a>
                 </li>
             </ul>
         </div>
-    </div> <!-- Fim Offcanvas -->
+    </div>
 
 
     <!-- Container Principal -->
-    <div class="container-fluid mt-3 mb-3 main-container"> <!-- Reduzida margem top/bottom -->
+    <div class="container-fluid mt-3 mb-3 main-container">
         <div id="alertPlaceholder" class="alert-container"></div>
 
-        <!-- Área de Dashboard (Visível após login) -->
+        <!-- Área de Dashboard -->
         <div id="dashboardArea" style="display: none;">
-            <div class="row g-3"> <!-- Espaçamento menor (g-3) -->
-
-                <!-- 1. Resumo Rápido (Saldo) - SEMPRE NO TOPO -->
+            <div class="row g-3">
+                <!-- Card de Resumo -->
                 <div class="col-12">
                     <div class="card shadow-sm mb-3">
                         <div class="card-body text-center p-2">
@@ -86,7 +82,9 @@
                                 <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
                                 <span class="visually-hidden">Carregando...</span>
                             </div>
-                            <h2 id="summaryBalanceMobile" class="fw-bold text-primary" style="display: none;">--:--</h2>
+                            <div id="summaryContent" style="display: none;">
+                                <h2 id="summaryBalanceMobile" class="fw-bold">--:--</h2>
+                            </div>
                             <a href="#" id="linkMeuPerfilRapido"
                                 class="btn btn-sm btn-outline-secondary mt-1 stretched-link">
                                 <i class="fas fa-user-circle me-1"></i>Ver Perfil/Histórico
@@ -145,15 +143,18 @@
                             <div id="statusDetailsMobile" style="display: none;">
                                 <ul class="list-group list-group-flush small">
                                     <li class="list-group-item d-flex justify-content-between ps-1 pe-1 pt-1 pb-1">
-                                        <span>Entrada:</span> <strong id="statusEntradaMobile">--:--</strong></li>
+                                        <span>Entrada:</span> <strong id="statusEntradaMobile">--:--</strong>
+                                    </li>
                                     <li class="list-group-item d-flex justify-content-between ps-1 pe-1 pt-1 pb-1">
                                         <span>Saída Almoço:</span> <strong id="statusSaidaAlmocoMobile">--:--</strong>
                                     </li>
                                     <li class="list-group-item d-flex justify-content-between ps-1 pe-1 pt-1 pb-1">
                                         <span>Retorno Almoço:</span> <strong
-                                            id="statusRetornoAlmocoMobile">--:--</strong></li>
+                                            id="statusRetornoAlmocoMobile">--:--</strong>
+                                    </li>
                                     <li class="list-group-item d-flex justify-content-between ps-1 pe-1 pt-1 pb-1">
-                                        <span>Saída:</span> <strong id="statusSaidaMobile">--:--</strong></li>
+                                        <span>Saída:</span> <strong id="statusSaidaMobile">--:--</strong>
+                                    </li>
                                     <li
                                         class="list-group-item d-flex justify-content-between ps-1 pe-1 pt-1 pb-1 bg-light">
                                         <strong>Trabalhado:</strong> <strong id="statusTotalHorasMobile">-.-- h</strong>

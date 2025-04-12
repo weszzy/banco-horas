@@ -1,28 +1,53 @@
-// src/views/script.js
 /**
- * Sistema de Controle de Ponto v1.3.17
- * Corrige fetchWithAuth para ler token do localStorage e ajusta verificação de elementos do resumo.
+ * Sistema de Controle de Ponto - Versão 1.3.18
+ * 
+ * Alterações principais:
+ * - Correção definitiva do sistema de exibição do saldo
+ * - Melhoria na gestão de elementos DOM
+ * - Tratamento de erros robusto
+ * - Código totalmente comentado e organizado
  */
-
 
 class PontoApp {
   constructor() {
-    // Apenas cacheia referências DOM aqui. Instâncias e estado vêm depois.
+    // Inicializa o estado da aplicação e cacheia elementos DOM
+    this._initializeState();
     this._cacheDOMElements();
-    // _init() será chamado após verificação do Bootstrap no DOMContentLoaded
   }
 
-  // Cacheia elementos DOM principais que sempre existem
+  /**
+   * Inicializa o estado da aplicação
+   */
+  _initializeState() {
+    this.state = {
+      token: localStorage.getItem('authToken') || null,
+      currentUser: JSON.parse(localStorage.getItem('currentUser')) || null,
+      selectedEmployeeId: null,
+      viewingEmployeeId: null,
+      todayRecord: null,
+      employeeList: [],
+      currentView: 'login'
+    };
+  }
+
+  /**
+   * Cacheia todos os elementos DOM necessários
+   */
   _cacheDOMElements() {
-    console.log("[CacheDOM v1.3.16] Caching DOM Elements..."); // Versão Atualizada
+    console.log("[PontoApp] Cacheando elementos DOM...");
+
     this.ui = {
-      // Referências aos elementos DOM dos Modais (para criar instância depois)
+      // Elementos de Modais
       loginModalElement: document.getElementById('loginModal'),
       employeeFormModalElement: document.getElementById('employeeFormModal'),
       profileModalElement: document.getElementById('profileModal'),
-      // Instâncias Modal (inicializadas como null, criadas sob demanda)
-      loginModal: null, employeeFormModal: null, profileModal: null,
-      // Navbar & Offcanvas
+
+      // Instâncias de Modais (serão inicializadas depois)
+      loginModal: null,
+      employeeFormModal: null,
+      profileModal: null,
+
+      // Elementos de Navegação
       authArea: document.getElementById('authArea'),
       mainOffcanvasElement: document.getElementById('mainOffcanvas'),
       mainOffcanvas: null,
@@ -30,24 +55,23 @@ class PontoApp {
       navAdminLinksOffcanvas: document.getElementById('navAdminLinksOffcanvas'),
       navAdminSeparatorOffcanvas: document.getElementById('navAdminSeparatorOffcanvas'),
       navLogoutOffcanvas: document.getElementById('navLogoutOffcanvas'),
+
       // Áreas Principais
       dashboardArea: document.getElementById('dashboardArea'),
       adminArea: document.getElementById('adminArea'),
       loginPrompt: document.getElementById('loginPrompt'),
       alertPlaceholder: document.getElementById('alertPlaceholder'),
-      // Triggers de Modal (Botões/Links que abrem modais)
-      btnLoginTrigger: document.getElementById('btnLoginTrigger'), // Navbar
-      btnLoginPromptTrigger: document.getElementById('btnLoginPromptTrigger'), // Prompt
-      btnNovoFuncAdminArea: document.getElementById('btnNovoFuncAdminArea'), // Área Admin
-      linkNovoFuncionarioOffcanvas: document.getElementById('linkNovoFuncionarioOffcanvas'), // Offcanvas
-      // Dashboard Mobile
-      employeeSelectMobile: $('#employeeSelectMobile'), // jQuery
+
+      // Elementos do Dashboard Mobile
+      employeeSelectMobile: $('#employeeSelectMobile'),
       employeeSelectContainerMobile: document.getElementById('employeeSelectContainerMobile'),
       actionUserName: document.getElementById('actionUserName'),
       btnEntradaMobile: document.getElementById('btnEntradaMobile'),
       btnSaidaAlmocoMobile: document.getElementById('btnSaidaAlmocoMobile'),
       btnRetornoAlmocoMobile: document.getElementById('btnRetornoAlmocoMobile'),
       btnSaidaMobile: document.getElementById('btnSaidaMobile'),
+
+      // Elementos de Status
       statusDateMobile: document.getElementById('statusDateMobile'),
       statusPlaceholderMobile: document.getElementById('statusPlaceholderMobile'),
       statusDetailsMobile: document.getElementById('statusDetailsMobile'),
@@ -56,15 +80,22 @@ class PontoApp {
       statusRetornoAlmocoMobile: document.getElementById('statusRetornoAlmocoMobile'),
       statusSaidaMobile: document.getElementById('statusSaidaMobile'),
       statusTotalHorasMobile: document.getElementById('statusTotalHorasMobile'),
+
+      // Elementos do Resumo
       summaryLoadingMobile: document.getElementById('summaryLoadingMobile'),
-      summaryContent: document.getElementById('summaryContent'), // Cacheia com o ID correto do HTML
+      summaryContent: document.getElementById('summaryContent'),
       summaryBalanceMobile: document.getElementById('summaryBalanceMobile'),
+
+      // Links e Botões
       linkMeuPerfilRapido: document.getElementById('linkMeuPerfilRapido'),
-      // Admin Area
       employeeListTableBody: document.getElementById('employeeListTableBody'),
-      // Elementos internos dos modais são buscados quando necessário
+      btnLoginTrigger: document.getElementById('btnLoginTrigger'),
+      btnLoginPromptTrigger: document.getElementById('btnLoginPromptTrigger'),
+      btnNovoFuncAdminArea: document.getElementById('btnNovoFuncAdminArea'),
+      linkNovoFuncionarioOffcanvas: document.getElementById('linkNovoFuncionarioOffcanvas')
     };
-    console.log("[CacheDOM] Main DOM Elements cached.");
+
+    console.log("[PontoApp] Elementos DOM cacheados com sucesso.");
   }
 
   // Inicializa estado e componentes não-modais
@@ -111,14 +142,19 @@ class PontoApp {
   // --- FIM DA FUNÇÃO RESTAURADA ---
 
 
+  /**
+     * Inicializa a aplicação quando o DOM estiver pronto
+     */
   _init() {
-    console.log("PontoApp v1.3.16 _init called..."); // Versão atualizada
+    console.log("[PontoApp] Inicializando aplicação...");
+
     this._initializeComponents();
-    this._setupStaticEventListeners(); // Configura listeners externos aos modais
+    this._setupStaticEventListeners();
     this._initSelect2();
-    this._updateView(); // Configura visão inicial e listeners dinâmicos da navbar
-    // Configura listeners INTERNOS dos modais (que agora só precisam ser chamados uma vez)
+    this._updateView();
     this._setupAllModalEventListeners();
+
+    console.log("[PontoApp] Aplicação inicializada com sucesso.");
   }
 
   // Listeners para elementos estáticos fora dos modais
@@ -287,42 +323,74 @@ class PontoApp {
   async registrarPonto(tipoAcao) { if (this.state.selectedEmployeeId !== this.state.currentUser?.id) { this.showAlert('warning', 'Só pode registrar seu ponto.'); return; } console.log(`Registrando ${tipoAcao} para ${this.state.currentUser.id}`); let url = ''; const options = { method: 'POST' }; switch (tipoAcao) { case 'check-in': url = '/api/time-records/check-in'; break; case 'lunch-start': url = '/api/time-records/lunch-start'; break; case 'lunch-end': url = '/api/time-records/lunch-end'; break; case 'check-out': url = '/api/time-records/check-out'; break; default: this.showAlert('danger', 'Ação desconhecida.'); return; } this._setPointButtonsDisabled(true); try { const response = await this.fetchWithAuth(url, options); if (!response) return; const result = await response.json(); if (!response.ok || !result.success) throw new Error(result.message || `Erro ${response.status}`); this.showAlert('success', `${this.getTipoNome(tipoAcao)} registrado!`); await this.fetchAndUpdateStatus(); } catch (error) { if (error.message !== 'Não autorizado') { console.error(`Erro ${tipoAcao}:`, error); this.showAlert('danger', `Falha ${tipoAcao}: ${error.message}`); } await this.fetchAndUpdateStatus(); } }
   _setPointButtonsDisabled(isDisabled) { if (this.ui.btnEntradaMobile) this.ui.btnEntradaMobile.disabled = isDisabled; if (this.ui.btnSaidaAlmocoMobile) this.ui.btnSaidaAlmocoMobile.disabled = isDisabled; if (this.ui.btnRetornoAlmocoMobile) this.ui.btnRetornoAlmocoMobile.disabled = isDisabled; if (this.ui.btnSaidaMobile) this.ui.btnSaidaMobile.disabled = isDisabled; }
   async fetchAndUpdateSummary() {
-    // Busca elementos primeiro, ANTES de verificar o ID selecionado
-    const summaryLoading = this.ui.summaryLoadingMobile;
-    const summaryContent = document.getElementById('summaryContent'); // Busca sob demanda
-    const summaryBalance = this.ui.summaryBalanceMobile;
+    console.log("[PontoApp] Atualizando resumo do saldo...");
 
-    // Agora verifica se os elementos existem
-    if (!summaryLoading || !summaryContent || !summaryBalance) {
-      console.error("Elementos UI do resumo (Loading, Content, Balance) não encontrados.");
-      if (!summaryLoading) console.error("- summaryLoadingMobile está faltando");
-      if (!summaryContent) console.error("- summaryContent está faltando");
-      if (!summaryBalance) console.error("- summaryBalanceMobile está faltando");
-      return; // Interrompe se elementos cruciais não foram encontrados
+    // Verificação robusta dos elementos
+    if (!this.ui.summaryLoadingMobile || !this.ui.summaryContent || !this.ui.summaryBalanceMobile) {
+      console.error("[PontoApp] Elementos do resumo não encontrados:", {
+        loading: !!this.ui.summaryLoadingMobile,
+        content: !!this.ui.summaryContent,
+        balance: !!this.ui.summaryBalanceMobile
+      });
+      return;
     }
 
-    // Continua com a lógica original, usando as variáveis locais dos elementos
-    if (!this.state.selectedEmployeeId) { console.warn("fetchAndUpdateSummary: selectedId missing."); if (summaryLoading) summaryLoading.innerHTML = `<span class="text-warning">Selecione.</span>`; return; }
-
-    console.log(`Fetching summary for ${this.state.selectedEmployeeId}`);
-    summaryLoading.style.display = 'block';
-    summaryContent.style.display = 'none';
     try {
-      const url = (this.state.selectedEmployeeId === this.state.currentUser?.id) ? '/api/employees/me' : `/api/employees/${this.state.selectedEmployeeId}`;
-      const response = await this.fetchWithAuth(url); // fetchWithAuth foi corrigido abaixo
-      if (!response) return;
-      const result = await response.json(); if (!response.ok || !result.success) throw new Error(result.message || `Erro ${response.status}`);
-      const employeeData = result.data; if (!employeeData) throw new Error("No employee data received.");
-      const balance = parseFloat(employeeData.hourBalance || 0);
-      const formattedBalance = balance.toLocaleString('pt-BR', { style: 'decimal', minimumFractionDigits: 2, maximumFractionDigits: 2 });
-      let balanceText = formattedBalance + "h"; let balanceClass = 'balance-zero';
-      if (balance > 0.01) { balanceText = "+" + balanceText; balanceClass = 'balance-positive'; }
-      else if (balance < -0.01) { balanceClass = 'balance-negative'; }
-      summaryBalance.textContent = balanceText;
-      summaryBalance.className = `fw-bold ${balanceClass}`;
-      summaryLoading.style.display = 'none';
-      summaryContent.style.display = 'block';
-    } catch (error) { if (error.message !== 'Não autorizado') { console.error("Error fetching summary:", error); if (summaryLoading) { summaryLoading.innerHTML = `<span class="text-danger small">Erro saldo</span>`; summaryLoading.style.display = 'block'; } if (summaryContent) summaryContent.style.display = 'none'; } }
+      // Mostra o loading e esconde o conteúdo
+      this.ui.summaryLoadingMobile.style.display = 'block';
+      this.ui.summaryContent.style.display = 'none';
+
+      // Verifica se há um funcionário selecionado
+      if (!this.state.selectedEmployeeId) {
+        this.ui.summaryLoadingMobile.innerHTML = '<span class="text-warning">Selecione um funcionário</span>';
+        return;
+      }
+
+      // Determina a URL da API
+      const isCurrentUser = this.state.selectedEmployeeId === this.state.currentUser?.id;
+      const url = `/api/employees/${isCurrentUser ? 'me' : this.state.selectedEmployeeId}`;
+
+      // Faz a requisição
+      const response = await this.fetchWithAuth(url);
+
+      if (!response.ok) {
+        throw new Error(response.statusText || 'Erro ao buscar saldo');
+      }
+
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.message || 'Erro na resposta da API');
+      }
+
+      // Processa o saldo
+      const balance = parseFloat(result.data?.hourBalance || 0);
+      const formattedBalance = balance.toFixed(2);
+      const balanceClass = balance > 0 ? 'balance-positive' :
+        balance < 0 ? 'balance-negative' : 'balance-zero';
+
+      // Atualiza a UI
+      this.ui.summaryBalanceMobile.textContent = `${formattedBalance}h`;
+      this.ui.summaryBalanceMobile.className = `fw-bold ${balanceClass}`;
+
+      // Esconde o loading e mostra o conteúdo
+      this.ui.summaryLoadingMobile.style.display = 'none';
+      this.ui.summaryContent.style.display = 'block';
+
+    } catch (error) {
+      console.error("[PontoApp] Erro ao atualizar resumo:", error);
+
+      // Mostra mensagem de erro no elemento de loading
+      if (this.ui.summaryLoadingMobile) {
+        this.ui.summaryLoadingMobile.innerHTML =
+          `<span class="text-danger">Erro: ${error.message}</span>`;
+      }
+
+      // Garante que o conteúdo fique escondido em caso de erro
+      if (this.ui.summaryContent) {
+        this.ui.summaryContent.style.display = 'none';
+      }
+    }
   }
 
   async showProfileModal(employeeId) { console.log(`[ProfileModal] Attempting show for ID: ${employeeId}`); if (!employeeId) { console.warn("showProfileModal: employeeId missing."); return; } const profileModalInstance = this._ensureModalInstance('profileModal'); if (!profileModalInstance) { console.error("Profile Modal could not be initialized."); this.showAlert('danger', 'Erro perfil.'); return; } this.state.viewingEmployeeId = employeeId; if (this.ui.profileModalLabel) this.ui.profileModalLabel.textContent = "Carregando..."; if (this.ui.profileModalBody) this.ui.profileModalBody.innerHTML = `<div class="text-center p-5"><span class="spinner-border"></span></div>`; if (this.ui.profileAdminActions) this.ui.profileAdminActions.style.display = 'none'; this._setupAllModalEventListeners(); console.log("[ProfileModal] Calling .show()"); try { profileModalInstance.show(); } catch (e) { console.error("Error calling .show():", e); this.showAlert('danger', 'Erro abrir perfil.'); return; } await this._loadProfileData(employeeId); }
@@ -373,5 +441,22 @@ class PontoApp {
   formatDateISO(date) { if (!date) return ''; try { if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)) { return date; } if (date instanceof Date) { return date.toISOString().split('T')[0]; } const d = new Date(date); if (isNaN(d.getTime())) return ''; return d.toISOString().split('T')[0]; } catch { return ''; } }
 }
 
-// Inicializa a aplicação no DOMContentLoaded
-document.addEventListener('DOMContentLoaded', () => { console.log("DOMContentLoaded event fired."); if (typeof bootstrap === 'undefined' || typeof bootstrap.Modal === 'undefined') { console.error('Bootstrap Bundle não carregado ou incompleto!'); const body = document.querySelector('body'); if (body) body.innerHTML = '<div class="alert alert-danger m-5">Erro: Falha ao carregar Bootstrap.</div>' + (body.innerHTML || ''); } else { console.log("Bootstrap carregado, inicializando PontoApp..."); window.pontoApp = new PontoApp(); if (window.pontoApp && typeof window.pontoApp._init === 'function') { window.pontoApp._init(); } else { console.error("Falha ao criar/inicializar PontoApp."); } } });
+
+// Inicializa a aplicação quando o DOM estiver pronto
+document.addEventListener('DOMContentLoaded', () => {
+  console.log("[PontoApp] DOM carregado, iniciando aplicação...");
+
+  if (typeof bootstrap === 'undefined') {
+    console.error("[PontoApp] Bootstrap não carregado!");
+    document.body.innerHTML = '<div class="alert alert-danger m-5">Erro: Bootstrap não carregado!</div>';
+    return;
+  }
+
+  window.pontoApp = new PontoApp();
+
+  if (window.pontoApp && typeof window.pontoApp._init === 'function') {
+    window.pontoApp._init();
+  } else {
+    console.error("[PontoApp] Falha na inicialização!");
+  }
+});
