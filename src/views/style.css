@@ -1,4 +1,5 @@
 /* src/views/style.css */
+/* Estilos gerais */
 :root {
     --primary-color: #0d6efd;
     --secondary-color: #6c757d;
@@ -11,23 +12,50 @@
 body {
     background-color: #f8f9fa;
     padding-top: 56px;
-    /* Altura da navbar fixa */
+    /* Espaço para a navbar fixa */
 }
 
 .main-container {
     padding-top: 0.75rem;
-    /* Menos padding geral */
     padding-bottom: 1rem;
 }
 
+/* Alertas */
 .alert-container {
     position: fixed;
     top: 65px;
-    /* Logo abaixo da navbar */
     left: 10px;
     right: 10px;
     z-index: 1100;
-    width: auto;
+}
+
+/* Estilos para o resumo do saldo */
+#summaryContent {
+    display: none;
+    /* Inicialmente escondido */
+    transition: opacity 0.3s ease;
+}
+
+#summaryBalanceMobile {
+    font-size: 2rem;
+    margin-bottom: 0.25rem;
+}
+
+.balance-positive {
+    color: var(--success-color);
+}
+
+.balance-negative {
+    color: var(--danger-color);
+}
+
+.balance-zero {
+    color: var(--secondary-color);
+}
+
+#summaryLoadingMobile .spinner-border {
+    width: 1.5rem;
+    height: 1.5rem;
 }
 
 /* Navbar */
