@@ -25,16 +25,5 @@ module.exports = {
         use_env_variable: "DATABASE_URL", // Ou configure um DB de teste
         dialect: 'postgres',
         logging: false,
-    },
-    production: {
-        use_env_variable: "DATABASE_URL", // Usa a mesma variável de ambiente no Render
-        dialect: 'postgres',              // **Define explicitamente o dialeto**
-        logging: false,                   // Desabilita log SQL em produção
-        dialectOptions: {
-            ssl: {
-                require: true,
-                rejectUnauthorized: false // Necessário para muitos serviços como Render/Heroku
-            }
-        }
     }
 };

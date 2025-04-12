@@ -1,5 +1,11 @@
 # Banco de Horas - Sistema de Controle de Ponto e Saldo
 
+<div align="center">
+
+[![wakatime](https://wakatime.com/badge/user/bdeb95f3-d0ba-450e-bb85-f5c3aa2006a7/project/a4e95214-73e5-46f3-8758-00d8969e5f21.svg)](https://wakatime.com/badge/user/bdeb95f3-d0ba-450e-bb85-f5c3aa2006a7/project/a4e95214-73e5-46f3-8758-00d8969e5f21)
+
+</div>
+
 Aplicação web desenvolvida para o registro eficiente de ponto e gerenciamento automatizado de banco de horas para equipes internas.
 
 ## Visão Geral
