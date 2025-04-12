@@ -1,26 +1,25 @@
 // src/views/script.js
 /**
- * Sistema de Controle de Ponto v1.3.13
- * Corrige erro 'Invalid left-hand side in assignment' no listener hidden.bs.modal.
- * Preserva toda a lógica original de v1.3.12.
+ * Sistema de Controle de Ponto v1.3.14
+ * Restaura inicialização de modais sob demanda para corrigir erros.
  */
 
 class PontoApp {
   constructor() {
-    // Apenas cacheia referências DOM aqui. Instâncias e estado vêm depois.
+    // Cacheia elementos DOM principais
     this._cacheDOMElements();
-    // _init() será chamado após verificação do Bootstrap no DOMContentLoaded
+    // Estado e outras inicializações no _init
   }
 
   // Cacheia elementos DOM principais que sempre existem
   _cacheDOMElements() {
-    console.log("[CacheDOM v1.3.13] Caching DOM Elements..."); // Versão atualizada
+    console.log("[CacheDOM v1.3.14] Caching DOM Elements...");
     this.ui = {
-      // Referências aos elementos dos Modais (para criar instância depois)
+      // Referências aos elementos DOM dos Modais
       loginModalElement: document.getElementById('loginModal'),
       employeeFormModalElement: document.getElementById('employeeFormModal'),
       profileModalElement: document.getElementById('profileModal'),
-      // Instâncias Modal (inicializadas como null, criadas sob demanda)
+      // Instâncias Modal (serão criadas sob demanda em _ensureModalInstance)
       loginModal: null, employeeFormModal: null, profileModal: null,
       // Navbar & Offcanvas
       authArea: document.getElementById('authArea'),
@@ -36,10 +35,10 @@ class PontoApp {
       loginPrompt: document.getElementById('loginPrompt'),
       alertPlaceholder: document.getElementById('alertPlaceholder'),
       // Triggers de Modal (Botões/Links que abrem modais)
-      btnLoginTrigger: document.getElementById('btnLoginTrigger'), // Navbar
-      btnLoginPromptTrigger: document.getElementById('btnLoginPromptTrigger'), // Prompt
-      btnNovoFuncAdminArea: document.getElementById('btnNovoFuncAdminArea'), // Área Admin
-      linkNovoFuncionarioOffcanvas: document.getElementById('linkNovoFuncionarioOffcanvas'), // Offcanvas
+      btnLoginTrigger: document.getElementById('btnLoginTrigger'),
+      btnLoginPromptTrigger: document.getElementById('btnLoginPromptTrigger'),
+      btnNovoFuncAdminArea: document.getElementById('btnNovoFuncAdminArea'),
+      linkNovoFuncionarioOffcanvas: document.getElementById('linkNovoFuncionarioOffcanvas'),
       // Dashboard Mobile
       employeeSelectMobile: $('#employeeSelectMobile'),
       employeeSelectContainerMobile: document.getElementById('employeeSelectContainerMobile'),
@@ -62,7 +61,7 @@ class PontoApp {
       linkMeuPerfilRapido: document.getElementById('linkMeuPerfilRapido'),
       // Admin Area
       employeeListTableBody: document.getElementById('employeeListTableBody'),
-      // Elementos internos dos modais não são cacheados aqui
+      // Elementos internos dos modais são buscados quando necessário
     };
     console.log("[CacheDOM] Main DOM Elements cached.");
   }
@@ -73,11 +72,12 @@ class PontoApp {
     const canInitOffcanvas = typeof bootstrap !== 'undefined' && bootstrap.Offcanvas;
     if (this.ui.mainOffcanvasElement && canInitOffcanvas) { this.ui.mainOffcanvas = new bootstrap.Offcanvas(this.ui.mainOffcanvasElement); }
     else { console.warn("[InitComp] Offcanvas init failed."); }
-    // NÃO inicializa modais aqui, eles serão inicializados sob demanda em _ensureModalInstance
+    // NÃO inicializa modais aqui
     this.state = { token: localStorage.getItem('authToken') || null, currentUser: JSON.parse(localStorage.getItem('currentUser')) || null, selectedEmployeeId: null, viewingEmployeeId: null, todayRecord: null, employeeList: [], currentView: 'login' };
     console.log("[InitComp] State and non-modal components initialized.");
   }
 
+  // **FUNÇÃO RESTAURADA E ESSENCIAL**
   // Garante que uma instância de modal exista, criando-a se necessário
   _ensureModalInstance(modalName) {
     const element = this.ui[modalName + 'Element'];
@@ -87,87 +87,87 @@ class PontoApp {
       if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
         try {
           this.ui[modalName] = new bootstrap.Modal(element);
-          // Adiciona listener para limpar erros/forms quando o modal é FECHADO
-          // Usando addEventListener para evitar sobrescrever outros possíveis listeners 'hidden'
+          console.log(`[Modal] Instância para ${modalName} criada com sucesso.`);
+          // Adiciona listener de limpeza UMA VEZ quando a instância é criada
           element.addEventListener('hidden.bs.modal', () => {
             console.log(`[Modal] ${modalName} fechado (hidden.bs.modal). Cleaning up...`);
-
-            // --- CORREÇÃO APLICADA AQUI ---
-            // Busca o elemento interno e *verifica se existe* antes de modificar
-            const loginErrorElement = element.querySelector('#loginError');
-            if (loginErrorElement) {
-              loginErrorElement.style.display = 'none';
-            }
-            const loginFormElement = element.querySelector('#loginForm');
-            loginFormElement?.reset(); // Pode usar optional chaining para métodos
-
-            const employeeFormElement = element.querySelector('#employeeForm');
-            if (employeeFormElement) {
-              employeeFormElement.reset();
-              employeeFormElement.classList.remove('was-validated');
-            }
-            const employeeFormErrorElement = element.querySelector('#employeeFormError');
-            if (employeeFormErrorElement) {
-              employeeFormErrorElement.style.display = 'none';
-            }
-            // --- FIM DA CORREÇÃO ---
-          });
-          console.log(`[Modal] Instância para ${modalName} criada com sucesso.`);
-        } catch (error) { console.error(`[Modal] Erro ao criar instância Bootstrap para ${modalName}:`, error); return null; }
+            const form = element.querySelector('form'); // Busca qualquer form dentro
+            form?.reset(); // Reseta o form se existir
+            form?.classList.remove('was-validated'); // Remove validação visual
+            element.querySelector('.alert-danger')?.style.display = 'none'; // Esconde erro
+          }, { once: false }); // Listener persiste para limpezas futuras
+        } catch (error) { console.error(`[Modal] Erro ao criar instância para ${modalName}:`, error); return null; }
       } else { console.error(`[Modal] Bootstrap indisponível para criar ${modalName}.`); return null; }
     }
     return this.ui[modalName];
   }
 
-
   _init() {
-    console.log("PontoApp v1.3.13 _init called..."); // Versão corrigida
+    console.log("PontoApp v1.3.14 _init called...");
     this._initializeComponents();
     this._setupStaticEventListeners();
     this._initSelect2();
     this._updateView();
-    this._setupAllModalEventListeners();
+    // NÃO chama _setupAllModalEventListeners aqui, eles serão configurados sob demanda
   }
 
   // Listeners para elementos estáticos fora dos modais
   _setupStaticEventListeners() {
     console.log("[Listeners] Setting up static event listeners...");
-    if (this.ui.btnLoginPromptTrigger) { this.ui.btnLoginPromptTrigger.addEventListener('click', () => { console.log("[Listeners] Botão Login (Prompt) clicado."); const modal = this._ensureModalInstance('loginModal'); if (modal) modal.show(); else this.showAlert('danger', 'Erro login.'); }); } else { console.warn("[Listeners] Static Warning: btnLoginPromptTrigger not found."); }
-    if (this.ui.btnNovoFuncAdminArea) { this.ui.btnNovoFuncAdminArea.addEventListener('click', () => { console.log("[Listeners] Botão Novo Func (Admin Area) clicado."); this.prepareEmployeeForm(null); const modal = this._ensureModalInstance('employeeFormModal'); if (modal) modal.show(); else this.showAlert('danger', 'Erro formulário.'); }); } else { console.warn("[Listeners] Static Warning: btnNovoFuncAdminArea not found."); }
+    // --- Triggers para abrir modais (usando _ensureModalInstance) ---
+    if (this.ui.btnLoginPromptTrigger) { this.ui.btnLoginPromptTrigger.addEventListener('click', () => { const modal = this._ensureModalInstance('loginModal'); if (modal) modal.show(); else this.showAlert('danger', 'Erro login.'); }); } else { console.warn("[Listeners] Static Warning: btnLoginPromptTrigger not found."); }
+    if (this.ui.btnNovoFuncAdminArea) { this.ui.btnNovoFuncAdminArea.addEventListener('click', () => { this.prepareEmployeeForm(null); const modal = this._ensureModalInstance('employeeFormModal'); if (modal) modal.show(); else this.showAlert('danger', 'Erro formulário.'); }); } else { console.warn("[Listeners] Static Warning: btnNovoFuncAdminArea not found."); }
+    // --- Botões de Ponto ---
     if (this.ui.btnEntradaMobile) this.ui.btnEntradaMobile.addEventListener('click', () => this.registrarPonto('check-in')); else console.error("[Listeners] Static Error: btnEntradaMobile not found");
     if (this.ui.btnSaidaAlmocoMobile) this.ui.btnSaidaAlmocoMobile.addEventListener('click', () => this.registrarPonto('lunch-start')); else console.error("[Listeners] Static Error: btnSaidaAlmocoMobile not found");
     if (this.ui.btnRetornoAlmocoMobile) this.ui.btnRetornoAlmocoMobile.addEventListener('click', () => this.registrarPonto('lunch-end')); else console.error("[Listeners] Static Error: btnRetornoAlmocoMobile not found");
     if (this.ui.btnSaidaMobile) this.ui.btnSaidaMobile.addEventListener('click', () => this.registrarPonto('check-out')); else console.error("[Listeners] Static Error: btnSaidaMobile not found");
+    // --- Select2 Admin ---
     if (this.ui.employeeSelectMobile?.length > 0) { this.ui.employeeSelectMobile.on('change', (e) => { const sv = $(e.target).val(); this.state.selectedEmployeeId = sv ? parseInt(sv, 10) : this.state.currentUser?.id; this.handleEmployeeSelectionChange(); }); } else { console.error("[Listeners] Static Error: employeeSelectMobile not found.") }
+    // --- Botão Ver Perfil Rápido ---
     if (this.ui.linkMeuPerfilRapido) { this.ui.linkMeuPerfilRapido.addEventListener('click', (e) => { e.preventDefault(); const tid = this.state.currentUser?.id; console.log("[Listeners] Link 'Meu Perfil Rápido' clicado. Target ID:", tid); if (tid) { this.showProfileModal(tid); } else { this.showAlert('info', 'Faça login.'); } }); } else { console.error("[Listeners] Static Error: linkMeuPerfilRapido not found"); }
+    // --- Listener para o EVENTO 'show' do modal de formulário (para preparar o form) ---
     if (this.ui.employeeFormModalElement) { this.ui.employeeFormModalElement.addEventListener('show.bs.modal', (e) => { const btn = e.relatedTarget; const empId = btn?.dataset.employeeId; this.prepareEmployeeForm(empId ? parseInt(empId, 10) : null); }); } else { console.error("[Listeners] Static Error: employeeFormModalElement not found."); }
+    // Listeners para FORMS (submit) são configurados em _setupAllModalEventListeners
     console.log("[Listeners] Static event listeners set up completed.");
   }
 
-  // Configura listeners para elementos DENTRO de todos os modais
+  // Configura listeners para elementos DENTRO de todos os modais (chamado uma vez no _init)
   _setupAllModalEventListeners() {
-    console.log("[Listeners] Setting up ALL modal event listeners...");
+    console.log("[Listeners] Setting up ALL modal event listeners (forms, specific buttons)...");
+    // --- Login Modal Listeners ---
     const loginModalElement = this.ui.loginModalElement;
     if (loginModalElement) {
       const loginForm = loginModalElement.querySelector('#loginForm');
       const btnSubmit = loginModalElement.querySelector('#btnLoginSubmit');
-      if (loginForm && !loginForm.listenerAttached) { loginForm.addEventListener('submit', (e) => { e.preventDefault(); this.handleLogin(); }); loginForm.listenerAttached = true; } else if (!loginForm) { console.error("[Listeners] loginForm not found in loginModal."); }
-      if (btnSubmit && !btnSubmit.listenerAttached) { btnSubmit.addEventListener('click', () => this.handleLogin()); btnSubmit.listenerAttached = true; } else if (!btnSubmit) { console.error("[Listeners] btnLoginSubmit not found in loginModal."); }
+      // Anexa listener ao FORMULÁRIO para submit (Enter)
+      if (loginForm && !loginForm.listenerAttached) { loginForm.addEventListener('submit', (e) => { e.preventDefault(); this.handleLogin(); }); loginForm.listenerAttached = true; }
+      else if (!loginForm) { console.error("[Listeners] loginForm not found inside loginModal."); }
+      // Anexa listener ao BOTÃO de submit para clique
+      if (btnSubmit && !btnSubmit.listenerAttached) { btnSubmit.addEventListener('click', () => this.handleLogin()); btnSubmit.listenerAttached = true; }
+      else if (!btnSubmit) { console.error("[Listeners] btnLoginSubmit not found inside loginModal."); }
     } else { console.error("[Listeners] loginModalElement not found."); }
+    // --- Employee Form Modal Listeners ---
     const employeeModalElement = this.ui.employeeFormModalElement;
     if (employeeModalElement) {
       const employeeForm = employeeModalElement.querySelector('#employeeForm');
       const btnSave = employeeModalElement.querySelector('#btnSaveChangesEmployee');
-      if (employeeForm && !employeeForm.listenerAttached) { employeeForm.addEventListener('submit', (e) => { e.preventDefault(); this.handleSaveEmployeeForm(); }); employeeForm.listenerAttached = true; } else if (!employeeForm) { console.error("[Listeners] employeeForm not found in employeeModal."); }
-      if (btnSave && !btnSave.listenerAttached) { btnSave.addEventListener('click', () => this.handleSaveEmployeeForm()); btnSave.listenerAttached = true; } else if (!btnSave) { console.error("[Listeners] btnSaveChangesEmployee not found in employeeModal."); }
+      if (employeeForm && !employeeForm.listenerAttached) { employeeForm.addEventListener('submit', (e) => { e.preventDefault(); this.handleSaveEmployeeForm(); }); employeeForm.listenerAttached = true; }
+      else if (!employeeForm) { console.error("[Listeners] employeeForm not found in employeeModal."); }
+      if (btnSave && !btnSave.listenerAttached) { btnSave.addEventListener('click', () => this.handleSaveEmployeeForm()); btnSave.listenerAttached = true; }
+      else if (!btnSave) { console.error("[Listeners] btnSaveChangesEmployee not found in employeeModal."); }
       employeeModalElement.querySelectorAll('input, select').forEach(input => { if (!input.listenerAttached) { input.addEventListener('input', () => { if (employeeForm?.classList.contains('was-validated')) { this._validateEmployeeForm(); } }); input.listenerAttached = true; } });
     } else { console.error("[Listeners] employeeFormModalElement not found."); }
+    // --- Profile Modal Listeners ---
     const profileModalElement = this.ui.profileModalElement;
     if (profileModalElement) {
       const btnEdit = profileModalElement.querySelector('#btnEditProfile');
       const btnToggle = profileModalElement.querySelector('#btnToggleActiveStatus');
-      if (btnEdit && !btnEdit.listenerAttached) { btnEdit.addEventListener('click', () => this.editProfileFromModal()); btnEdit.listenerAttached = true; } else if (!btnEdit) { console.error("[Listeners] btnEditProfile not found in profileModal."); }
-      if (btnToggle && !btnToggle.listenerAttached) { btnToggle.addEventListener('click', () => this.toggleActiveStatusFromModal()); btnToggle.listenerAttached = true; } else if (!btnToggle) { console.error("[Listeners] btnToggleActiveStatus not found in profileModal."); }
+      if (btnEdit && !btnEdit.listenerAttached) { btnEdit.addEventListener('click', () => this.editProfileFromModal()); btnEdit.listenerAttached = true; }
+      else if (!btnEdit) { console.error("[Listeners] btnEditProfile not found in profileModal."); }
+      if (btnToggle && !btnToggle.listenerAttached) { btnToggle.addEventListener('click', () => this.toggleActiveStatusFromModal()); btnToggle.listenerAttached = true; }
+      else if (!btnToggle) { console.error("[Listeners] btnToggleActiveStatus not found in profileModal."); }
+      // Listeners para botões delete na tabela são adicionados em renderProfileModalContent
     } else { console.error("[Listeners] profileModalElement not found."); }
     console.log("[Listeners] All modal event listeners set up.");
   }
@@ -185,43 +185,29 @@ class PontoApp {
     if (linkGerenciar) { if (!linkGerenciar.onclick) { linkGerenciar.onclick = (e) => { e.preventDefault(); this.ui.mainOffcanvas?.hide(); this.setView('admin'); }; console.log("[Listeners] Dynamic Listener: Gerenciar (Offcanvas) attached."); } }
     else { if (this.ui.navAdminLinksOffcanvas?.style.display !== 'none') console.warn("[Listeners] Dynamic Warning: linkGerenciarFuncionariosOffcanvas not found."); }
     const linkNovoFunc = document.getElementById('linkNovoFuncionarioOffcanvas');
-    if (linkNovoFunc) { if (!linkNovoFunc.onclick) { linkNovoFunc.onclick = (e) => { e.preventDefault(); console.log("[Listeners] Link Novo Funcionário (Offcanvas) clicado."); if (this.ui.mainOffcanvas) this.ui.mainOffcanvas.hide(); this.prepareEmployeeForm(null); const modal = this.ui.employeeFormModal || this._ensureModalInstance('employeeFormModal'); if (modal) modal.show(); else this.showAlert('danger', 'Erro ao abrir formulário.'); }; console.log("[Listeners] Dynamic Listener: Novo Funcionário (Offcanvas) attached."); } } else { if (this.ui.navAdminLinksOffcanvas?.style.display !== 'none') console.warn("[Listeners] Dynamic Warning: linkNovoFuncionarioOffcanvas not found."); }
+    if (linkNovoFunc) { if (!linkNovoFunc.onclick) { linkNovoFunc.onclick = (e) => { e.preventDefault(); console.log("[Listeners] Link Novo Funcionário (Offcanvas) clicado."); if (this.ui.mainOffcanvas) this.ui.mainOffcanvas.hide(); this.prepareEmployeeForm(null); const modal = this._ensureModalInstance('employeeFormModal'); if (modal) modal.show(); else this.showAlert('danger', 'Erro formulário.'); }; console.log("[Listeners] Dynamic Listener: Novo Funcionário (Offcanvas) attached."); } } else { if (this.ui.navAdminLinksOffcanvas?.style.display !== 'none') console.warn("[Listeners] Dynamic Warning: linkNovoFuncionarioOffcanvas not found."); }
     if (!this.state.token) {
       const btnLoginTriggerNavbar = document.getElementById('btnLoginTrigger');
-      if (btnLoginTriggerNavbar) { if (!btnLoginTriggerNavbar.onclick) { btnLoginTriggerNavbar.onclick = () => { console.log("[Listeners] Botão Login (Navbar) clicado."); const modal = this.ui.loginModal || this._ensureModalInstance('loginModal'); if (modal) modal.show(); else this.showAlert('danger', 'Erro ao abrir login.'); }; console.log("[Listeners] Dynamic Listener: Login (Navbar) attached."); } } else { console.warn("[Listeners] Dynamic Warning: btnLoginTrigger (Navbar) not found."); }
+      if (btnLoginTriggerNavbar) { if (!btnLoginTriggerNavbar.onclick) { btnLoginTriggerNavbar.onclick = () => { console.log("[Listeners] Botão Login (Navbar) clicado."); const modal = this._ensureModalInstance('loginModal'); if (modal) modal.show(); else this.showAlert('danger', 'Erro login.'); }; console.log("[Listeners] Dynamic Listener: Login (Navbar) attached."); } } else { console.warn("[Listeners] Dynamic Warning: btnLoginTrigger (Navbar) not found."); }
     }
     console.log("[Listeners] Dynamic event listeners for Navbar/Offcanvas set up completed.");
   }
 
   // ================ MÉTODOS RESTANTES (LÓGICA PRESERVADA) ================
-
-  _initSelect2() {
-    const targetSelect = this.ui.employeeSelectMobile; if (targetSelect && targetSelect.length > 0 && typeof $.fn.select2 === 'function') { try { targetSelect.select2({ placeholder: "Visualizar outro...", allowClear: true, width: '100%', dropdownParent: targetSelect.parent() }); targetSelect.prop('disabled', true); console.log("Select2 initialized for mobile."); } catch (error) { console.error("Erro ao inicializar Select2:", error); this.showAlert('warning', 'Erro seletor func.') } } else if (!(typeof $.fn.select2 === 'function')) { console.error("Select2 function not available."); } else { console.error("Select2 element (mobile) not found."); }
-  }
-
-  setView(viewName) {
-    console.log(`Setting view to: ${viewName}`); this.state.currentView = viewName; if (this.ui.loginPrompt) this.ui.loginPrompt.style.display = viewName === 'login' ? 'block' : 'none'; if (this.ui.dashboardArea) this.ui.dashboardArea.style.display = viewName === 'dashboard' ? 'block' : 'none'; if (this.ui.adminArea) this.ui.adminArea.style.display = viewName === 'admin' ? 'block' : 'none'; if (viewName === 'admin') { this.loadAndDisplayAdminEmployeeList(); } else if (viewName === 'dashboard') { this.fetchAndUpdateDashboard(); } this._updateNavLinks();
-  }
-
-  _updateView() {
-    console.log("Updating view based on auth state..."); if (this.state.token && this.state.currentUser) { if (this.ui.navLinksOffcanvas) this.ui.navLinksOffcanvas.style.display = 'block'; else console.error("navLinksOffcanvas missing"); if (this.ui.navLogoutOffcanvas) this.ui.navLogoutOffcanvas.style.display = 'block'; else console.error("navLogoutOffcanvas missing"); if (this.ui.authArea) { this.ui.authArea.innerHTML = `<span class="navbar-text me-3 small text-white-50">Olá, ${this.state.currentUser.fullName.split(' ')[0]}</span>`; } else { console.error("authArea missing"); } if (this.state.currentUser.role === 'admin') { if (this.ui.navAdminLinksOffcanvas) this.ui.navAdminLinksOffcanvas.style.display = 'block'; else console.error("navAdminLinksOffcanvas missing"); if (this.ui.navAdminSeparatorOffcanvas) this.ui.navAdminSeparatorOffcanvas.style.display = 'block'; else console.error("navAdminSeparatorOffcanvas missing"); if (this.ui.employeeSelectContainerMobile) this.ui.employeeSelectContainerMobile.style.display = 'block'; if (this.ui.employeeSelectMobile?.length > 0) this.ui.employeeSelectMobile.prop('disabled', false); this.setView(this.state.currentView !== 'login' ? this.state.currentView : 'dashboard'); } else { if (this.ui.navAdminLinksOffcanvas) this.ui.navAdminLinksOffcanvas.style.display = 'none'; if (this.ui.navAdminSeparatorOffcanvas) this.ui.navAdminSeparatorOffcanvas.style.display = 'none'; if (this.ui.employeeSelectContainerMobile) this.ui.employeeSelectContainerMobile.style.display = 'none'; if (this.ui.employeeSelectMobile?.length > 0) this.ui.employeeSelectMobile.prop('disabled', true); this.setView('dashboard'); } setTimeout(() => this._setupDynamicEventListeners(), 0); } else { if (this.ui.navLinksOffcanvas) this.ui.navLinksOffcanvas.style.display = 'none'; if (this.ui.navAdminLinksOffcanvas) this.ui.navAdminLinksOffcanvas.style.display = 'none'; if (this.ui.navAdminSeparatorOffcanvas) this.ui.navAdminSeparatorOffcanvas.style.display = 'none'; if (this.ui.navLogoutOffcanvas) this.ui.navLogoutOffcanvas.style.display = 'none'; if (this.ui.authArea) { this.ui.authArea.innerHTML = `<button class="btn btn-primary btn-sm" id="btnLoginTrigger">Login</button>`; } this.setView('login'); setTimeout(() => this._setupDynamicEventListeners(), 0); } console.log("View update process finished.");
-  }
-
+  _initSelect2() { const targetSelect = this.ui.employeeSelectMobile; if (targetSelect && targetSelect.length > 0 && typeof $.fn.select2 === 'function') { try { targetSelect.select2({ placeholder: "Visualizar outro...", allowClear: true, width: '100%', dropdownParent: targetSelect.parent() }); targetSelect.prop('disabled', true); console.log("Select2 initialized for mobile."); } catch (error) { console.error("Erro ao inicializar Select2:", error); this.showAlert('warning', 'Erro seletor func.') } } else if (!(typeof $.fn.select2 === 'function')) { console.error("Select2 function not available."); } else { console.error("Select2 element (mobile) not found."); } }
+  setView(viewName) { console.log(`Setting view to: ${viewName}`); this.state.currentView = viewName; if (this.ui.loginPrompt) this.ui.loginPrompt.style.display = viewName === 'login' ? 'block' : 'none'; if (this.ui.dashboardArea) this.ui.dashboardArea.style.display = viewName === 'dashboard' ? 'block' : 'none'; if (this.ui.adminArea) this.ui.adminArea.style.display = viewName === 'admin' ? 'block' : 'none'; if (viewName === 'admin') { this.loadAndDisplayAdminEmployeeList(); } else if (viewName === 'dashboard') { this.fetchAndUpdateDashboard(); } this._updateNavLinks(); }
+  _updateView() { console.log("Updating view based on auth state..."); if (this.state.token && this.state.currentUser) { if (this.ui.navLinksOffcanvas) this.ui.navLinksOffcanvas.style.display = 'block'; else console.error("navLinksOffcanvas missing"); if (this.ui.navLogoutOffcanvas) this.ui.navLogoutOffcanvas.style.display = 'block'; else console.error("navLogoutOffcanvas missing"); if (this.ui.authArea) { this.ui.authArea.innerHTML = `<span class="navbar-text me-3 small text-white-50">Olá, ${this.state.currentUser.fullName.split(' ')[0]}</span>`; } else { console.error("authArea missing"); } if (this.state.currentUser.role === 'admin') { if (this.ui.navAdminLinksOffcanvas) this.ui.navAdminLinksOffcanvas.style.display = 'block'; else console.error("navAdminLinksOffcanvas missing"); if (this.ui.navAdminSeparatorOffcanvas) this.ui.navAdminSeparatorOffcanvas.style.display = 'block'; else console.error("navAdminSeparatorOffcanvas missing"); if (this.ui.employeeSelectContainerMobile) this.ui.employeeSelectContainerMobile.style.display = 'block'; if (this.ui.employeeSelectMobile?.length > 0) this.ui.employeeSelectMobile.prop('disabled', false); this.setView(this.state.currentView !== 'login' ? this.state.currentView : 'dashboard'); } else { if (this.ui.navAdminLinksOffcanvas) this.ui.navAdminLinksOffcanvas.style.display = 'none'; if (this.ui.navAdminSeparatorOffcanvas) this.ui.navAdminSeparatorOffcanvas.style.display = 'none'; if (this.ui.employeeSelectContainerMobile) this.ui.employeeSelectContainerMobile.style.display = 'none'; if (this.ui.employeeSelectMobile?.length > 0) this.ui.employeeSelectMobile.prop('disabled', true); this.setView('dashboard'); } setTimeout(() => this._setupDynamicEventListeners(), 0); } else { if (this.ui.navLinksOffcanvas) this.ui.navLinksOffcanvas.style.display = 'none'; if (this.ui.navAdminLinksOffcanvas) this.ui.navAdminLinksOffcanvas.style.display = 'none'; if (this.ui.navAdminSeparatorOffcanvas) this.ui.navAdminSeparatorOffcanvas.style.display = 'none'; if (this.ui.navLogoutOffcanvas) this.ui.navLogoutOffcanvas.style.display = 'none'; if (this.ui.authArea) { this.ui.authArea.innerHTML = `<button class="btn btn-primary btn-sm" id="btnLoginTrigger">Login</button>`; } this.setView('login'); setTimeout(() => this._setupDynamicEventListeners(), 0); } console.log("View update process finished."); }
   _updateNavLinks() { document.querySelectorAll('#mainOffcanvas .nav-link').forEach(link => link.classList.remove('active')); if (this.state.currentView === 'admin') { document.getElementById('linkGerenciarFuncionariosOffcanvas')?.classList.add('active'); } }
-
-  async handleLogin() {
-    console.log("Handling login..."); const loginModal = this._ensureModalInstance('loginModal'); if (!loginModal) { console.error("Login Modal not initialized."); return; } const loginForm = this.ui.loginModalElement?.querySelector('#loginForm'); const btnSubmit = this.ui.loginModalElement?.querySelector('#btnLoginSubmit'); const loginError = this.ui.loginModalElement?.querySelector('#loginError'); if (!loginForm || !btnSubmit || !loginError) { console.error("Elementos internos login modal não encontrados."); return; } this._setupAllModalEventListeners(); const email = loginForm.email.value; const password = loginForm.password.value; loginError.style.display = 'none'; if (!email || !password) { loginError.textContent = 'E-mail/senha obrigatórios.'; loginError.style.display = 'block'; return; } btnSubmit.disabled = true; btnSubmit.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Entrando...'; try { const response = await fetch('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) }); if (!response) throw new Error("Falha na requisição."); const result = await response.json(); if (!response.ok || !result.success) throw new Error(result.message || `Erro ${response.status}`); this.state.token = result.data.token; this.state.currentUser = result.data.user; localStorage.setItem('authToken', this.state.token); localStorage.setItem('currentUser', JSON.stringify(this.state.currentUser)); console.log("Login successful."); loginModal.hide(); this._updateView(); } catch (error) { console.error("Login failed:", error); loginError.textContent = `Falha: ${error.message}`; loginError.style.display = 'block'; } finally { btnSubmit.disabled = false; btnSubmit.innerHTML = 'Entrar'; }
-  }
-
+  async handleLogin() { console.log("Handling login..."); const loginModal = this._ensureModalInstance('loginModal'); if (!loginModal) { console.error("Login Modal not initialized."); return; } const loginForm = this.ui.loginModalElement?.querySelector('#loginForm'); const btnSubmit = this.ui.loginModalElement?.querySelector('#btnLoginSubmit'); const loginError = this.ui.loginModalElement?.querySelector('#loginError'); if (!loginForm || !btnSubmit || !loginError) { console.error("Elementos internos login modal não encontrados."); return; } this._setupAllModalEventListeners(); const email = loginForm.email.value; const password = loginForm.password.value; loginError.style.display = 'none'; if (!email || !password) { loginError.textContent = 'E-mail/senha obrigatórios.'; loginError.style.display = 'block'; return; } btnSubmit.disabled = true; btnSubmit.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Entrando...'; try { const response = await fetch('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) }); if (!response) throw new Error("Falha na requisição."); const result = await response.json(); if (!response.ok || !result.success) throw new Error(result.message || `Erro ${response.status}`); this.state.token = result.data.token; this.state.currentUser = result.data.user; localStorage.setItem('authToken', this.state.token); localStorage.setItem('currentUser', JSON.stringify(this.state.currentUser)); console.log("Login successful."); loginModal.hide(); this._updateView(); } catch (error) { console.error("Login failed:", error); loginError.textContent = `Falha: ${error.message}`; loginError.style.display = 'block'; } finally { btnSubmit.disabled = false; btnSubmit.innerHTML = 'Entrar'; } }
   handleLogout() { console.log("Handling logout..."); this.state.token = null; this.state.currentUser = null; localStorage.removeItem('authToken'); localStorage.removeItem('currentUser'); if (this.ui.employeeSelectMobile?.length > 0) { this.ui.employeeSelectMobile.val(null).trigger('change'); this.ui.employeeSelectMobile.prop('disabled', true); } this._updateView(); this.resetDashboardState(); console.log("Logout complete."); }
   resetDashboardState() { console.log("Resetting dashboard state (mobile)..."); this.state.selectedEmployeeId = null; this.state.todayRecord = null; if (this.ui.employeeSelectMobile?.length > 0) { this.ui.employeeSelectMobile.val(null).trigger('change'); } if (this.ui.statusPlaceholderMobile) { this.ui.statusPlaceholderMobile.textContent = 'Carregando...'; this.ui.statusPlaceholderMobile.style.display = 'block'; } if (this.ui.statusDetailsMobile) this.ui.statusDetailsMobile.style.display = 'none'; if (this.ui.statusEntradaMobile) this.ui.statusEntradaMobile.textContent = '--:--'; if (this.ui.statusSaidaAlmocoMobile) this.ui.statusSaidaAlmocoMobile.textContent = '--:--'; if (this.ui.statusRetornoAlmocoMobile) this.ui.statusRetornoAlmocoMobile.textContent = '--:--'; if (this.ui.statusSaidaMobile) this.ui.statusSaidaMobile.textContent = '--:--'; if (this.ui.statusTotalHorasMobile) this.ui.statusTotalHorasMobile.textContent = '-.-- h'; if (this.ui.statusDateMobile) this.ui.statusDateMobile.textContent = '--/--'; if (this.ui.summaryLoadingMobile) { this.ui.summaryLoadingMobile.style.display = 'block'; this.ui.summaryLoadingMobile.innerHTML = `<span class="spinner-border spinner-border-sm"></span>`; } if (this.ui.summaryContentMobile) this.ui.summaryContentMobile.style.display = 'none'; if (this.ui.summaryBalanceMobile) this.ui.summaryBalanceMobile.textContent = '--:--'; this._setPointButtonsDisabled(true); }
   async fetchAndUpdateDashboard() { if (!this.state.currentUser) { console.warn("fetchAndUpdateDashboard: currentUser is null."); return; } console.log("Updating Dashboard..."); this.resetDashboardState(); let initialEmployeeId = this.state.currentUser.id; if (this.state.currentUser.role === 'admin') { if (this.ui.employeeSelectContainerMobile) this.ui.employeeSelectContainerMobile.style.display = 'block'; if (this.ui.employeeSelectMobile?.length > 0) this.ui.employeeSelectMobile.prop('disabled', false); await this.loadEmployeeListForAdmin(); initialEmployeeId = this.ui.employeeSelectMobile?.length > 0 ? (parseInt(this.ui.employeeSelectMobile.val(), 10) || this.state.currentUser.id) : this.state.currentUser.id; } else { if (this.ui.employeeSelectContainerMobile) this.ui.employeeSelectContainerMobile.style.display = 'none'; if (this.ui.employeeSelectMobile?.length > 0) this.ui.employeeSelectMobile.prop('disabled', true); initialEmployeeId = this.state.currentUser.id; } this.state.selectedEmployeeId = initialEmployeeId; if (this.ui.employeeSelectMobile?.length > 0) { this.ui.employeeSelectMobile.val(this.state.selectedEmployeeId).trigger('change.select2'); } if (this.ui.actionUserName) { this.ui.actionUserName.textContent = `Para: ${this.state.currentUser.id === this.state.selectedEmployeeId ? 'Você' : (this.state.employeeList.find(e => e.id === this.state.selectedEmployeeId)?.fullName || 'Desconhecido')}`; } await this.fetchAndUpdateStatus(); await this.fetchAndUpdateSummary(); }
   handleEmployeeSelectionChange() { if (!this.state.selectedEmployeeId) { this.state.selectedEmployeeId = this.state.currentUser?.id; if (this.ui.employeeSelectMobile?.length > 0) { this.ui.employeeSelectMobile.val(this.state.selectedEmployeeId).trigger('change.select2'); } } if (!this.state.selectedEmployeeId) { this.resetDashboardState(); return; } console.log("Selection changed to employeeId:", this.state.selectedEmployeeId); if (this.ui.actionUserName) { this.ui.actionUserName.textContent = `Para: ${this.state.currentUser.id === this.state.selectedEmployeeId ? 'Você' : (this.state.employeeList.find(e => e.id === this.state.selectedEmployeeId)?.fullName || 'Desconhecido')}`; } this.fetchAndUpdateStatus(); this.fetchAndUpdateSummary(); }
-  async fetchAndUpdateStatus() { const targetEmployeeId = this.state.selectedEmployeeId; if (!targetEmployeeId) { console.warn("fetchAndUpdateStatus: targetId missing."); if (this.ui.statusPlaceholderMobile) { /*...*/ } this.updateActionButtons(); return; } console.log(`Fetching status for ${targetEmployeeId}`); if (this.ui.statusPlaceholderMobile) { /*...*/ } if (this.ui.statusDetailsMobile) this.ui.statusDetailsMobile.style.display = 'none'; this._setPointButtonsDisabled(true); try { let url = ''; if (targetEmployeeId === this.state.currentUser?.id) { url = '/api/time-records/today'; } else if (this.state.currentUser?.role === 'admin') { await this.fetchHistoryAndFindToday(targetEmployeeId); this.updateStatusUI(); this.updateActionButtons(); return; } else { throw new Error("Unauthorized."); } const response = await this.fetchWithAuth(url); if (!response) return; const result = await response.json(); if (!response.ok) { if (response.status === 404) { this.state.todayRecord = null; } else { throw new Error(result.message || `Err ${response.status}`); } } else { this.state.todayRecord = result.data; } this.updateStatusUI(); this.updateActionButtons(); } catch (error) { if (error.message !== 'Não autorizado') { console.error(`Err fetch status ${targetEmployeeId}:`, error); this.showAlert('danger', `Falha status: ${error.message}`); if (this.ui.statusPlaceholderMobile) this.ui.statusPlaceholderMobile.textContent = 'Erro status.'; } if (this.ui.statusPlaceholderMobile) this.ui.statusPlaceholderMobile.style.display = 'block'; if (this.ui.statusDetailsMobile) this.ui.statusDetailsMobile.style.display = 'none'; this.updateActionButtons(); } }
+  async fetchAndUpdateStatus() { const targetEmployeeId = this.state.selectedEmployeeId; if (!targetEmployeeId) { console.warn("fetchAndUpdateStatus: targetId missing."); if (this.ui.statusPlaceholderMobile) { this.ui.statusPlaceholderMobile.textContent = 'Selecione...'; this.ui.statusPlaceholderMobile.style.display = 'block'; } if (this.ui.statusDetailsMobile) this.ui.statusDetailsMobile.style.display = 'none'; this.updateActionButtons(); return; } console.log(`Fetching status for ${targetEmployeeId}`); if (this.ui.statusPlaceholderMobile) { this.ui.statusPlaceholderMobile.textContent = 'Carregando...'; this.ui.statusPlaceholderMobile.style.display = 'block'; } if (this.ui.statusDetailsMobile) this.ui.statusDetailsMobile.style.display = 'none'; this._setPointButtonsDisabled(true); try { let url = ''; if (targetEmployeeId === this.state.currentUser?.id) { url = '/api/time-records/today'; } else if (this.state.currentUser?.role === 'admin') { await this.fetchHistoryAndFindToday(targetEmployeeId); this.updateStatusUI(); this.updateActionButtons(); return; } else { throw new Error("Unauthorized."); } const response = await this.fetchWithAuth(url); if (!response) return; const result = await response.json(); if (!response.ok) { if (response.status === 404) { this.state.todayRecord = null; } else { throw new Error(result.message || `Err ${response.status}`); } } else { this.state.todayRecord = result.data; } this.updateStatusUI(); this.updateActionButtons(); } catch (error) { if (error.message !== 'Não autorizado') { console.error(`Err fetch status ${targetEmployeeId}:`, error); this.showAlert('danger', `Falha status: ${error.message}`); if (this.ui.statusPlaceholderMobile) this.ui.statusPlaceholderMobile.textContent = 'Erro status.'; } if (this.ui.statusPlaceholderMobile) this.ui.statusPlaceholderMobile.style.display = 'block'; if (this.ui.statusDetailsMobile) this.ui.statusDetailsMobile.style.display = 'none'; this.updateActionButtons(); } }
   async fetchHistoryAndFindToday(employeeId) { this.state.todayRecord = null; try { const response = await this.fetchWithAuth(`/api/time-records/employee/${employeeId}`); if (!response) return; const result = await response.json(); if (!response.ok) throw new Error(result.message || `Err ${response.status}`); const todayStr = new Date().toISOString().split('T')[0]; this.state.todayRecord = result.data?.find(r => r.startTime?.startsWith(todayStr)) || null; } catch (error) { if (error.message !== 'Não autorizado') { console.error(`Err fetch history ${employeeId}:`, error); this.showAlert('danger', `Falha histórico: ${error.message}`); } } }
   updateStatusUI() { const record = this.state.todayRecord; if (!this.ui.statusPlaceholderMobile || !this.ui.statusDetailsMobile || !this.ui.statusEntradaMobile || !this.ui.statusSaidaAlmocoMobile || !this.ui.statusRetornoAlmocoMobile || !this.ui.statusSaidaMobile || !this.ui.statusTotalHorasMobile || !this.ui.statusDateMobile) { console.error("Mobile status UI elements missing."); return; } if (this.ui.statusDateMobile) this.ui.statusDateMobile.textContent = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }); if (!record) { this.ui.statusPlaceholderMobile.textContent = 'Nenhum registro hoje.'; this.ui.statusPlaceholderMobile.style.display = 'block'; this.ui.statusDetailsMobile.style.display = 'none'; } else { this.ui.statusPlaceholderMobile.style.display = 'none'; this.ui.statusDetailsMobile.style.display = 'block'; this.ui.statusEntradaMobile.textContent = this.formatTime(record.startTime); this.ui.statusSaidaAlmocoMobile.textContent = this.formatTime(record.lunchStartTime); this.ui.statusRetornoAlmocoMobile.textContent = this.formatTime(record.lunchEndTime); this.ui.statusSaidaMobile.textContent = this.formatTime(record.endTime); this.ui.statusTotalHorasMobile.textContent = record.totalHours ? `${parseFloat(record.totalHours).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} h` : '-.-- h'; } }
   updateActionButtons() { console.log("[UpdateButtons] Updating action buttons (Mobile)..."); const record = this.state.todayRecord; const canPerformActions = this.state.currentUser?.id === this.state.selectedEmployeeId; console.log(`[UpdateButtons] canPerformActions: ${canPerformActions}, todayRecord:`, record ? 'Exists' : 'null'); if (!this.ui.btnEntradaMobile || !this.ui.btnSaidaAlmocoMobile || !this.ui.btnRetornoAlmocoMobile || !this.ui.btnSaidaMobile) { console.error("[UpdateButtons] Mobile action buttons not found."); return; } const btnEntradaDisabled = !canPerformActions || !!record; const btnSaidaAlmocoDisabled = !canPerformActions || !record || !!record?.lunchStartTime || !!record?.endTime; const btnRetornoAlmocoDisabled = !canPerformActions || !record || !record?.lunchStartTime || !!record?.lunchEndTime || !!record?.endTime; const btnSaidaDisabled = !canPerformActions || !record || !!record?.endTime; this.ui.btnEntradaMobile.disabled = btnEntradaDisabled; this.ui.btnSaidaAlmocoMobile.disabled = btnSaidaAlmocoDisabled; this.ui.btnRetornoAlmocoMobile.disabled = btnRetornoAlmocoDisabled; this.ui.btnSaidaMobile.disabled = btnSaidaDisabled; console.log(`[UpdateButtons] Final state (Mobile): Entrada(${!btnEntradaDisabled}), SaidaAlmoco(${!btnSaidaAlmocoDisabled}), RetornoAlmoco(${!btnRetornoAlmocoDisabled}), Saida(${!btnSaidaDisabled})`); }
-  async registrarPonto(tipoAcao) { if (this.state.selectedEmployeeId !== this.state.currentUser?.id) { this.showAlert('warning', 'Você só pode registrar seu próprio ponto.'); return; } console.log(`Registrando ${tipoAcao} para ${this.state.currentUser.id}`); let url = ''; const options = { method: 'POST' }; switch (tipoAcao) { case 'check-in': url = '/api/time-records/check-in'; break; case 'lunch-start': url = '/api/time-records/lunch-start'; break; case 'lunch-end': url = '/api/time-records/lunch-end'; break; case 'check-out': url = '/api/time-records/check-out'; break; default: this.showAlert('danger', 'Ação desconhecida.'); return; } this._setPointButtonsDisabled(true); try { const response = await this.fetchWithAuth(url, options); if (!response) return; const result = await response.json(); if (!response.ok || !result.success) throw new Error(result.message || `Erro ${response.status}`); this.showAlert('success', `${this.getTipoNome(tipoAcao)} registrado!`); await this.fetchAndUpdateStatus(); } catch (error) { if (error.message !== 'Não autorizado') { console.error(`Erro ${tipoAcao}:`, error); this.showAlert('danger', `Falha ${tipoAcao}: ${error.message}`); } await this.fetchAndUpdateStatus(); } }
+  async registrarPonto(tipoAcao) { if (this.state.selectedEmployeeId !== this.state.currentUser?.id) { this.showAlert('warning', 'Só pode registrar seu ponto.'); return; } console.log(`Registrando ${tipoAcao} para ${this.state.currentUser.id}`); let url = ''; const options = { method: 'POST' }; switch (tipoAcao) { case 'check-in': url = '/api/time-records/check-in'; break; case 'lunch-start': url = '/api/time-records/lunch-start'; break; case 'lunch-end': url = '/api/time-records/lunch-end'; break; case 'check-out': url = '/api/time-records/check-out'; break; default: this.showAlert('danger', 'Ação desconhecida.'); return; } this._setPointButtonsDisabled(true); try { const response = await this.fetchWithAuth(url, options); if (!response) return; const result = await response.json(); if (!response.ok || !result.success) throw new Error(result.message || `Erro ${response.status}`); this.showAlert('success', `${this.getTipoNome(tipoAcao)} registrado!`); await this.fetchAndUpdateStatus(); } catch (error) { if (error.message !== 'Não autorizado') { console.error(`Erro ${tipoAcao}:`, error); this.showAlert('danger', `Falha ${tipoAcao}: ${error.message}`); } await this.fetchAndUpdateStatus(); } }
   _setPointButtonsDisabled(isDisabled) { if (this.ui.btnEntradaMobile) this.ui.btnEntradaMobile.disabled = isDisabled; if (this.ui.btnSaidaAlmocoMobile) this.ui.btnSaidaAlmocoMobile.disabled = isDisabled; if (this.ui.btnRetornoAlmocoMobile) this.ui.btnRetornoAlmocoMobile.disabled = isDisabled; if (this.ui.btnSaidaMobile) this.ui.btnSaidaMobile.disabled = isDisabled; }
   async fetchAndUpdateSummary() { if (!this.state.selectedEmployeeId) { console.warn("fetchAndUpdateSummary: selectedId missing."); if (this.ui.summaryLoadingMobile) this.ui.summaryLoadingMobile.innerHTML = `<span class="text-warning">Selecione.</span>`; return; } if (!this.ui.summaryLoadingMobile || !this.ui.summaryContentMobile || !this.ui.summaryBalanceMobile) { console.error("Mobile summary UI elements missing."); return; } console.log(`Fetching summary for ${this.state.selectedEmployeeId}`); this.ui.summaryLoadingMobile.style.display = 'block'; this.ui.summaryContentMobile.style.display = 'none'; try { const url = (this.state.selectedEmployeeId === this.state.currentUser?.id) ? '/api/employees/me' : `/api/employees/${this.state.selectedEmployeeId}`; const response = await this.fetchWithAuth(url); if (!response) return; const result = await response.json(); if (!response.ok || !result.success) throw new Error(result.message || `Erro ${response.status}`); const employeeData = result.data; if (!employeeData) throw new Error("No employee data received."); const balance = parseFloat(employeeData.hourBalance || 0); const formattedBalance = balance.toLocaleString('pt-BR', { style: 'decimal', minimumFractionDigits: 2, maximumFractionDigits: 2 }); let balanceText = formattedBalance + "h"; let balanceClass = 'balance-zero'; if (balance > 0.01) { balanceText = "+" + balanceText; balanceClass = 'balance-positive'; } else if (balance < -0.01) { balanceClass = 'balance-negative'; } this.ui.summaryBalanceMobile.textContent = balanceText; this.ui.summaryBalanceMobile.className = `fw-bold ${balanceClass}`; this.ui.summaryLoadingMobile.style.display = 'none'; this.ui.summaryContentMobile.style.display = 'block'; } catch (error) { if (error.message !== 'Não autorizado') { console.error("Error fetching summary:", error); if (this.ui.summaryLoadingMobile) { this.ui.summaryLoadingMobile.innerHTML = `<span class="text-danger small">Erro saldo</span>`; this.ui.summaryLoadingMobile.style.display = 'block'; } if (this.ui.summaryContentMobile) this.ui.summaryContentMobile.style.display = 'none'; } } }
   async showProfileModal(employeeId) { console.log(`[ProfileModal] Attempting show for ID: ${employeeId}`); if (!employeeId) { console.warn("showProfileModal: employeeId missing."); return; } const profileModalInstance = this.ui.profileModal; if (!profileModalInstance) { console.error("Profile Modal could not be initialized."); this.showAlert('danger', 'Erro perfil.'); return; } this.state.viewingEmployeeId = employeeId; if (this.ui.profileModalLabel) this.ui.profileModalLabel.textContent = "Carregando..."; if (this.ui.profileModalBody) this.ui.profileModalBody.innerHTML = `<div class="text-center p-5"><span class="spinner-border"></span></div>`; if (this.ui.profileAdminActions) this.ui.profileAdminActions.style.display = 'none'; this._setupAllModalEventListeners(); console.log("[ProfileModal] Calling .show()"); try { profileModalInstance.show(); } catch (e) { console.error("Error calling .show():", e); this.showAlert('danger', 'Erro abrir perfil.'); return; } try { const empResponse = await this.fetchWithAuth(`/api/employees/${employeeId}`); if (!empResponse) return; const empResult = await empResponse.json(); if (!empResponse.ok || !empResult.success) throw new Error(`Erro Perfil: ${empResult.message || empResponse.statusText}`); const employee = empResult.data; if (!employee) throw new Error("Dados funcionário API vazios."); const endDate = new Date(); const startDate = new Date(); startDate.setDate(endDate.getDate() - 7); const histUrl = `/api/time-records/employee/${employeeId}/balance-history?startDate=${this.formatDateISO(startDate)}&endDate=${this.formatDateISO(endDate)}`; const histResponse = await this.fetchWithAuth(histUrl); let history = []; if (histResponse) { const histResult = await histResponse.json(); if (histResponse.ok && histResult.success) { history = histResult.data; } else { console.warn(`Falha histórico saldo: ${histResult?.message}`); } } this.renderProfileModalContent(employee, history); } catch (error) { if (error.message !== 'Não autorizado') { console.error("Erro carregar perfil:", error); if (this.ui.profileModalBody) { this.ui.profileModalBody.innerHTML = `<div class="alert alert-danger m-3">Erro: ${error.message}</div>`; } } } }
