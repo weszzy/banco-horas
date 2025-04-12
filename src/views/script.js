@@ -1,8 +1,9 @@
 // src/views/script.js
 /**
  * Sistema de Controle de Ponto v1.3.16
- * Restaura _ensureModalInstance e corrige lógica de abertura de modais e listeners internos.
+ * Corrige cache e acesso aos elementos do resumo de saldo.
  */
+
 
 class PontoApp {
   constructor() {
@@ -56,6 +57,7 @@ class PontoApp {
       statusSaidaMobile: document.getElementById('statusSaidaMobile'),
       statusTotalHorasMobile: document.getElementById('statusTotalHorasMobile'),
       summaryLoadingMobile: document.getElementById('summaryLoadingMobile'),
+      summaryContent: document.getElementById('summaryContent'), // Cacheia com o ID correto do HTML
       summaryBalanceMobile: document.getElementById('summaryBalanceMobile'),
       linkMeuPerfilRapido: document.getElementById('linkMeuPerfilRapido'),
       // Admin Area
@@ -271,6 +273,7 @@ class PontoApp {
   handleLogout() { console.log("Handling logout..."); this.state.token = null; this.state.currentUser = null; localStorage.removeItem('authToken'); localStorage.removeItem('currentUser'); if (this.ui.employeeSelectMobile?.length > 0) { this.ui.employeeSelectMobile.val(null).trigger('change'); this.ui.employeeSelectMobile.prop('disabled', true); } this._updateView(); this.resetDashboardState(); console.log("Logout complete."); }
   resetDashboardState() {
     console.log("Resetting dashboard state (mobile)..."); this.state.selectedEmployeeId = null; this.state.todayRecord = null; if (this.ui.employeeSelectMobile?.length > 0) { this.ui.employeeSelectMobile.val(null).trigger('change'); } if (this.ui.statusPlaceholderMobile) { this.ui.statusPlaceholderMobile.textContent = 'Carregando...'; this.ui.statusPlaceholderMobile.style.display = 'block'; } if (this.ui.statusDetailsMobile) this.ui.statusDetailsMobile.style.display = 'none'; if (this.ui.statusEntradaMobile) this.ui.statusEntradaMobile.textContent = '--:--'; if (this.ui.statusSaidaAlmocoMobile) this.ui.statusSaidaAlmocoMobile.textContent = '--:--'; if (this.ui.statusRetornoAlmocoMobile) this.ui.statusRetornoAlmocoMobile.textContent = '--:--'; if (this.ui.statusSaidaMobile) this.ui.statusSaidaMobile.textContent = '--:--'; if (this.ui.statusTotalHorasMobile) this.ui.statusTotalHorasMobile.textContent = '-.-- h'; if (this.ui.statusDateMobile) this.ui.statusDateMobile.textContent = '--/--'; if (this.ui.summaryLoadingMobile) { this.ui.summaryLoadingMobile.style.display = 'block'; this.ui.summaryLoadingMobile.innerHTML = `<span class="spinner-border spinner-border-sm"></span>`; }
+    if (this.ui.summaryContent) this.ui.summaryContent.style.display = 'none'; // Usa a referência cacheada correta
     const summaryContentElement = document.getElementById('summaryContent');
     if (summaryContentElement) summaryContentElement.style.display = 'none';
     if (this.ui.summaryContentMobile) this.ui.summaryContentMobile.style.display = 'none'; if (this.ui.summaryBalanceMobile) this.ui.summaryBalanceMobile.textContent = '--:--'; this._setPointButtonsDisabled(true);
@@ -286,52 +289,27 @@ class PontoApp {
   async fetchAndUpdateSummary() {
     if (!this.state.selectedEmployeeId) { console.warn("fetchAndUpdateSummary: selectedId missing."); if (this.ui.summaryLoadingMobile) this.ui.summaryLoadingMobile.innerHTML = `<span class="text-warning">Selecione.</span>`; return; }
 
-    const summaryLoading = this.ui.summaryLoadingMobile; // Mantém do cache
-    const summaryContent = document.getElementById('summaryContent'); // Busca AGORA
-    const summaryBalance = this.ui.summaryBalanceMobile; // Mantém do cache
-
-    if (!summaryLoading || !summaryContent || !summaryBalance) {
-      console.error("Elementos UI do resumo não encontrados no momento da execução.");
-      if (!summaryLoading) console.error("- summaryLoadingMobile está faltando");
-      if (!summaryContent) console.error("- summaryContent está faltando");
-      if (!summaryBalance) console.error("- summaryBalanceMobile está faltando");
-      return;
-    }
     // --- CORREÇÃO NA VERIFICAÇÃO ---
-    // Verifica os elementos que REALMENTE usa para exibir o resumo
+    // Verifica os elementos cacheados que a função realmente usa
     if (!this.ui.summaryLoadingMobile || !this.ui.summaryContent || !this.ui.summaryBalanceMobile) {
-      console.error("Elementos UI do resumo (Mobile/Content/Balance) não encontrados.");
-      // Loga quais especificamente estão faltando
-      if (!this.ui.summaryLoadingMobile) console.error("- summaryLoadingMobile está faltando");
-      if (!this.ui.summaryContent) console.error("- summaryContent está faltando"); // Verifica ID correto
-      if (!this.ui.summaryBalanceMobile) console.error("- summaryBalanceMobile está faltando");
-      return;
+      console.error("Elementos UI do resumo (Loading, Content, Balance) não encontrados no cache.");
+      if (!this.ui.summaryLoadingMobile) console.error("- summaryLoadingMobile ref missing");
+      if (!this.ui.summaryContent) console.error("- summaryContent ref missing"); // Verifica ref correta
+      if (!this.ui.summaryBalanceMobile) console.error("- summaryBalanceMobile ref missing");
+      return; // Interrompe se elementos cruciais não foram cacheados
     }
     // --- FIM DA CORREÇÃO ---
+
     console.log(`Fetching summary for ${this.state.selectedEmployeeId}`);
-    summaryLoading.style.display = 'block';
-    summaryContent.style.display = 'none'; // Usa a variável local
+    this.ui.summaryLoadingMobile.style.display = 'block';
+    this.ui.summaryContent.style.display = 'none'; // Usa a ref correta
     try {
-      const url = (this.state.selectedEmployeeId === this.state.currentUser?.id) ? '/api/employees/me' : `/api/employees/${this.state.selectedEmployeeId}`;
-      const response = await this.fetchWithAuth(url); if (!response) return;
-      const result = await response.json(); if (!response.ok || !result.success) throw new Error(result.message || `Erro ${response.status}`);
-      const employeeData = result.data; if (!employeeData) throw new Error("No employee data received.");
-      const balance = parseFloat(employeeData.hourBalance || 0);
-      const formattedBalance = balance.toLocaleString('pt-BR', { style: 'decimal', minimumFractionDigits: 2, maximumFractionDigits: 2 });
-      let balanceText = formattedBalance + "h"; let balanceClass = 'balance-zero';
-      if (balance > 0.01) { balanceText = "+" + balanceText; balanceClass = 'balance-positive'; }
-      else if (balance < -0.01) { balanceClass = 'balance-negative'; }
-      summaryBalance.textContent = balanceText;
-      summaryBalance.className = `fw-bold ${balanceClass}`; // Cuidado ao sobrescrever classes
-      summaryLoading.style.display = 'none';
-      summaryContent.style.display = 'block'; // Usa a variável local
-    } catch (error) {
-      if (error.message !== 'Não autorizado') {
-        console.error("Error fetching summary:", error);
-        if (summaryLoading) { summaryLoading.innerHTML = `<span class="text-danger small">Erro saldo</span>`; summaryLoading.style.display = 'block'; }
-        if (summaryContent) summaryContent.style.display = 'none'; // Usa a variável local
-      }
-    }
+      const url = (this.state.selectedEmployeeId === this.state.currentUser?.id) ? '/api/employees/me' : `/api/employees/${this.state.selectedEmployeeId}`; const response = await this.fetchWithAuth(url); if (!response) return; const result = await response.json(); if (!response.ok || !result.success) throw new Error(result.message || `Erro ${response.status}`); const employeeData = result.data; if (!employeeData) throw new Error("No employee data received."); const balance = parseFloat(employeeData.hourBalance || 0); const formattedBalance = balance.toLocaleString('pt-BR', { style: 'decimal', minimumFractionDigits: 2, maximumFractionDigits: 2 }); let balanceText = formattedBalance + "h"; let balanceClass = 'balance-zero'; if (balance > 0.01) { balanceText = "+" + balanceText; balanceClass = 'balance-positive'; } else if (balance < -0.01) { balanceClass = 'balance-negative'; }
+      this.ui.summaryBalanceMobile.textContent = balanceText;
+      this.ui.summaryBalanceMobile.className = `fw-bold ${balanceClass}`;
+      this.ui.summaryLoadingMobile.style.display = 'none';
+      this.ui.summaryContent.style.display = 'block'; // Usa a ref correta
+    } catch (error) { if (error.message !== 'Não autorizado') { console.error("Error fetching summary:", error); if (this.ui.summaryLoadingMobile) { this.ui.summaryLoadingMobile.innerHTML = `<span class="text-danger small">Erro saldo</span>`; this.ui.summaryLoadingMobile.style.display = 'block'; } if (this.ui.summaryContent) this.ui.summaryContent.style.display = 'none'; } } // Usa ref correta
   }
 
   async showProfileModal(employeeId) { console.log(`[ProfileModal] Attempting show for ID: ${employeeId}`); if (!employeeId) { console.warn("showProfileModal: employeeId missing."); return; } const profileModalInstance = this._ensureModalInstance('profileModal'); if (!profileModalInstance) { console.error("Profile Modal could not be initialized."); this.showAlert('danger', 'Erro perfil.'); return; } this.state.viewingEmployeeId = employeeId; if (this.ui.profileModalLabel) this.ui.profileModalLabel.textContent = "Carregando..."; if (this.ui.profileModalBody) this.ui.profileModalBody.innerHTML = `<div class="text-center p-5"><span class="spinner-border"></span></div>`; if (this.ui.profileAdminActions) this.ui.profileAdminActions.style.display = 'none'; this._setupAllModalEventListeners(); console.log("[ProfileModal] Calling .show()"); try { profileModalInstance.show(); } catch (e) { console.error("Error calling .show():", e); this.showAlert('danger', 'Erro abrir perfil.'); return; } await this._loadProfileData(employeeId); }
