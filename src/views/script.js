@@ -1,7 +1,7 @@
 // src/views/script.js
 /**
- * Sistema de Controle de Ponto v1.3.14
- * Restaura inicialização de modais sob demanda para corrigir erros.
+ * Sistema de Controle de Ponto v1.3.15
+ * Adiciona logs aos listeners dos botões de login.
  */
 
 class PontoApp {
@@ -113,7 +113,7 @@ class PontoApp {
   }
 
   _init() {
-    console.log("PontoApp v1.3.14 _init called...");
+    console.log("PontoApp v1.3.15 _init called...");
     this._initializeComponents();
     this._setupStaticEventListeners();
     this._initSelect2();
@@ -198,9 +198,27 @@ class PontoApp {
     if (linkNovoFunc) { if (!linkNovoFunc.onclick) { linkNovoFunc.onclick = (e) => { e.preventDefault(); console.log("[Listeners] Link Novo Funcionário (Offcanvas) clicado."); if (this.ui.mainOffcanvas) this.ui.mainOffcanvas.hide(); this.prepareEmployeeForm(null); const modal = this._ensureModalInstance('employeeFormModal'); if (modal) modal.show(); else this.showAlert('danger', 'Erro formulário.'); }; console.log("[Listeners] Dynamic Listener: Novo Funcionário (Offcanvas) attached."); } } else { if (this.ui.navAdminLinksOffcanvas?.style.display !== 'none') console.warn("[Listeners] Dynamic Warning: linkNovoFuncionarioOffcanvas not found."); }
     if (!this.state.token) {
       const btnLoginTriggerNavbar = document.getElementById('btnLoginTrigger');
-      if (btnLoginTriggerNavbar) { if (!btnLoginTriggerNavbar.onclick) { btnLoginTriggerNavbar.onclick = () => { console.log("[Listeners] Botão Login (Navbar) clicado."); const modal = this._ensureModalInstance('loginModal'); if (modal) modal.show(); else this.showAlert('danger', 'Erro login.'); }; console.log("[Listeners] Dynamic Listener: Login (Navbar) attached."); } } else { console.warn("[Listeners] Dynamic Warning: btnLoginTrigger (Navbar) not found."); }
+      if (!this.state.token) {
+        const btnLoginTriggerNavbar = document.getElementById('btnLoginTrigger');
+        if (btnLoginTriggerNavbar) {
+          if (!btnLoginTriggerNavbar.onclick) {
+            btnLoginTriggerNavbar.onclick = () => {
+              // <<< LOG ADICIONADO >>>
+              console.log("[Listeners] Botão Login (Navbar) CLICADO. Tentando abrir modal...");
+              const modal = this._ensureModalInstance('loginModal');
+              if (modal) {
+                modal.show();
+              } else {
+                console.error("[Listeners] Falha ao obter/criar instância do Login Modal (Navbar).");
+                this.showAlert('danger', 'Erro ao abrir formulário de login.');
+              }
+            };
+            console.log("[Listeners] Dynamic Listener: Login (Navbar) attached.");
+          }
+        } else { console.warn("[Listeners] Dynamic Warning: btnLoginTrigger (Navbar) not found."); }
+      }
+      console.log("[Listeners] Dynamic event listeners for Navbar/Offcanvas set up completed.");
     }
-    console.log("[Listeners] Dynamic event listeners for Navbar/Offcanvas set up completed.");
   }
 
   // ================ MÉTODOS RESTANTES (LÓGICA PRESERVADA) ================
