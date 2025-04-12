@@ -1,7 +1,7 @@
 // src/views/script.js
 /**
- * Sistema de Controle de Ponto v1.3.16
- * Corrige cache e acesso aos elementos do resumo de saldo.
+ * Sistema de Controle de Ponto v1.3.17
+ * Corrige fetchWithAuth para ler token do localStorage e ajusta verificação de elementos do resumo.
  */
 
 
@@ -287,29 +287,42 @@ class PontoApp {
   async registrarPonto(tipoAcao) { if (this.state.selectedEmployeeId !== this.state.currentUser?.id) { this.showAlert('warning', 'Só pode registrar seu ponto.'); return; } console.log(`Registrando ${tipoAcao} para ${this.state.currentUser.id}`); let url = ''; const options = { method: 'POST' }; switch (tipoAcao) { case 'check-in': url = '/api/time-records/check-in'; break; case 'lunch-start': url = '/api/time-records/lunch-start'; break; case 'lunch-end': url = '/api/time-records/lunch-end'; break; case 'check-out': url = '/api/time-records/check-out'; break; default: this.showAlert('danger', 'Ação desconhecida.'); return; } this._setPointButtonsDisabled(true); try { const response = await this.fetchWithAuth(url, options); if (!response) return; const result = await response.json(); if (!response.ok || !result.success) throw new Error(result.message || `Erro ${response.status}`); this.showAlert('success', `${this.getTipoNome(tipoAcao)} registrado!`); await this.fetchAndUpdateStatus(); } catch (error) { if (error.message !== 'Não autorizado') { console.error(`Erro ${tipoAcao}:`, error); this.showAlert('danger', `Falha ${tipoAcao}: ${error.message}`); } await this.fetchAndUpdateStatus(); } }
   _setPointButtonsDisabled(isDisabled) { if (this.ui.btnEntradaMobile) this.ui.btnEntradaMobile.disabled = isDisabled; if (this.ui.btnSaidaAlmocoMobile) this.ui.btnSaidaAlmocoMobile.disabled = isDisabled; if (this.ui.btnRetornoAlmocoMobile) this.ui.btnRetornoAlmocoMobile.disabled = isDisabled; if (this.ui.btnSaidaMobile) this.ui.btnSaidaMobile.disabled = isDisabled; }
   async fetchAndUpdateSummary() {
-    if (!this.state.selectedEmployeeId) { console.warn("fetchAndUpdateSummary: selectedId missing."); if (this.ui.summaryLoadingMobile) this.ui.summaryLoadingMobile.innerHTML = `<span class="text-warning">Selecione.</span>`; return; }
+    // Busca elementos primeiro, ANTES de verificar o ID selecionado
+    const summaryLoading = this.ui.summaryLoadingMobile;
+    const summaryContent = document.getElementById('summaryContent'); // Busca sob demanda
+    const summaryBalance = this.ui.summaryBalanceMobile;
 
-    // --- CORREÇÃO NA VERIFICAÇÃO ---
-    // Verifica os elementos cacheados que a função realmente usa
-    if (!this.ui.summaryLoadingMobile || !this.ui.summaryContent || !this.ui.summaryBalanceMobile) {
-      console.error("Elementos UI do resumo (Loading, Content, Balance) não encontrados no cache.");
-      if (!this.ui.summaryLoadingMobile) console.error("- summaryLoadingMobile ref missing");
-      if (!this.ui.summaryContent) console.error("- summaryContent ref missing"); // Verifica ref correta
-      if (!this.ui.summaryBalanceMobile) console.error("- summaryBalanceMobile ref missing");
-      return; // Interrompe se elementos cruciais não foram cacheados
+    // Agora verifica se os elementos existem
+    if (!summaryLoading || !summaryContent || !summaryBalance) {
+      console.error("Elementos UI do resumo (Loading, Content, Balance) não encontrados.");
+      if (!summaryLoading) console.error("- summaryLoadingMobile está faltando");
+      if (!summaryContent) console.error("- summaryContent está faltando");
+      if (!summaryBalance) console.error("- summaryBalanceMobile está faltando");
+      return; // Interrompe se elementos cruciais não foram encontrados
     }
-    // --- FIM DA CORREÇÃO ---
+
+    // Continua com a lógica original, usando as variáveis locais dos elementos
+    if (!this.state.selectedEmployeeId) { console.warn("fetchAndUpdateSummary: selectedId missing."); if (summaryLoading) summaryLoading.innerHTML = `<span class="text-warning">Selecione.</span>`; return; }
 
     console.log(`Fetching summary for ${this.state.selectedEmployeeId}`);
-    this.ui.summaryLoadingMobile.style.display = 'block';
-    this.ui.summaryContent.style.display = 'none'; // Usa a ref correta
+    summaryLoading.style.display = 'block';
+    summaryContent.style.display = 'none';
     try {
-      const url = (this.state.selectedEmployeeId === this.state.currentUser?.id) ? '/api/employees/me' : `/api/employees/${this.state.selectedEmployeeId}`; const response = await this.fetchWithAuth(url); if (!response) return; const result = await response.json(); if (!response.ok || !result.success) throw new Error(result.message || `Erro ${response.status}`); const employeeData = result.data; if (!employeeData) throw new Error("No employee data received."); const balance = parseFloat(employeeData.hourBalance || 0); const formattedBalance = balance.toLocaleString('pt-BR', { style: 'decimal', minimumFractionDigits: 2, maximumFractionDigits: 2 }); let balanceText = formattedBalance + "h"; let balanceClass = 'balance-zero'; if (balance > 0.01) { balanceText = "+" + balanceText; balanceClass = 'balance-positive'; } else if (balance < -0.01) { balanceClass = 'balance-negative'; }
-      this.ui.summaryBalanceMobile.textContent = balanceText;
-      this.ui.summaryBalanceMobile.className = `fw-bold ${balanceClass}`;
-      this.ui.summaryLoadingMobile.style.display = 'none';
-      this.ui.summaryContent.style.display = 'block'; // Usa a ref correta
-    } catch (error) { if (error.message !== 'Não autorizado') { console.error("Error fetching summary:", error); if (this.ui.summaryLoadingMobile) { this.ui.summaryLoadingMobile.innerHTML = `<span class="text-danger small">Erro saldo</span>`; this.ui.summaryLoadingMobile.style.display = 'block'; } if (this.ui.summaryContent) this.ui.summaryContent.style.display = 'none'; } } // Usa ref correta
+      const url = (this.state.selectedEmployeeId === this.state.currentUser?.id) ? '/api/employees/me' : `/api/employees/${this.state.selectedEmployeeId}`;
+      const response = await this.fetchWithAuth(url); // fetchWithAuth foi corrigido abaixo
+      if (!response) return;
+      const result = await response.json(); if (!response.ok || !result.success) throw new Error(result.message || `Erro ${response.status}`);
+      const employeeData = result.data; if (!employeeData) throw new Error("No employee data received.");
+      const balance = parseFloat(employeeData.hourBalance || 0);
+      const formattedBalance = balance.toLocaleString('pt-BR', { style: 'decimal', minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      let balanceText = formattedBalance + "h"; let balanceClass = 'balance-zero';
+      if (balance > 0.01) { balanceText = "+" + balanceText; balanceClass = 'balance-positive'; }
+      else if (balance < -0.01) { balanceClass = 'balance-negative'; }
+      summaryBalance.textContent = balanceText;
+      summaryBalance.className = `fw-bold ${balanceClass}`;
+      summaryLoading.style.display = 'none';
+      summaryContent.style.display = 'block';
+    } catch (error) { if (error.message !== 'Não autorizado') { console.error("Error fetching summary:", error); if (summaryLoading) { summaryLoading.innerHTML = `<span class="text-danger small">Erro saldo</span>`; summaryLoading.style.display = 'block'; } if (summaryContent) summaryContent.style.display = 'none'; } }
   }
 
   async showProfileModal(employeeId) { console.log(`[ProfileModal] Attempting show for ID: ${employeeId}`); if (!employeeId) { console.warn("showProfileModal: employeeId missing."); return; } const profileModalInstance = this._ensureModalInstance('profileModal'); if (!profileModalInstance) { console.error("Profile Modal could not be initialized."); this.showAlert('danger', 'Erro perfil.'); return; } this.state.viewingEmployeeId = employeeId; if (this.ui.profileModalLabel) this.ui.profileModalLabel.textContent = "Carregando..."; if (this.ui.profileModalBody) this.ui.profileModalBody.innerHTML = `<div class="text-center p-5"><span class="spinner-border"></span></div>`; if (this.ui.profileAdminActions) this.ui.profileAdminActions.style.display = 'none'; this._setupAllModalEventListeners(); console.log("[ProfileModal] Calling .show()"); try { profileModalInstance.show(); } catch (e) { console.error("Error calling .show():", e); this.showAlert('danger', 'Erro abrir perfil.'); return; } await this._loadProfileData(employeeId); }
@@ -323,7 +336,37 @@ class PontoApp {
   prepareEmployeeForm(employeeId = null) { const employeeFormModal = this.ui.employeeFormModal; if (!employeeFormModal) { console.error("Modal form func. não init."); return; } this._setupAllModalEventListeners(); if (!this.ui.employeeForm || !this.ui.employeeFormModalLabel || !this.ui.btnSaveChangesEmployee || !this.ui.passwordFieldContainer || !this.ui.employeePassword || !this.ui.passwordHelp || !this.ui.employeeEmail || !this.ui.employeeFormError) { console.error("Elementos form func. não encontrados."); return; } this.ui.employeeForm.reset(); this.ui.employeeForm.classList.remove('was-validated'); this.ui.employeeFormError.style.display = 'none'; this.ui.employeeId.value = employeeId || ''; if (employeeId) { this.ui.employeeFormModalLabel.textContent = "Editar Funcionário"; this.ui.btnSaveChangesEmployee.textContent = "Salvar Alterações"; this.ui.passwordFieldContainer.style.display = 'block'; this.ui.employeePassword.required = false; this.ui.passwordHelp.textContent = 'Deixe em branco para não alterar.'; this.ui.employeeEmail.disabled = true; const employee = this.state.employeeList.find(emp => emp.id === employeeId); if (employee) { Object.keys(employee).forEach(key => { const input = this.ui.employeeForm.elements[key]; if (input) { if (input.type === 'date') input.value = this.formatDateISO(employee[key]); else input.value = employee[key]; } }); } } else { this.ui.employeeFormModalLabel.textContent = "Cadastrar Novo Funcionário"; this.ui.btnSaveChangesEmployee.textContent = "Cadastrar Funcionário"; this.ui.passwordFieldContainer.style.display = 'block'; this.ui.employeePassword.required = true; this.ui.passwordHelp.textContent = 'Mínimo 6 caracteres.'; this.ui.employeeEmail.disabled = false; } }
   async handleSaveEmployeeForm() { const employeeFormModal = this.ui.employeeFormModal; if (!employeeFormModal) { console.error("Modal form func. não init."); return; } this._setupAllModalEventListeners(); if (!this._validateEmployeeForm()) { if (this.ui.employeeFormError) { this.ui.employeeFormError.textContent = 'Corrija os campos inválidos.'; this.ui.employeeFormError.style.display = 'block'; } return; } if (this.ui.employeeFormError) this.ui.employeeFormError.style.display = 'none'; const employeeId = this.ui.employeeId.value; const isEditing = !!employeeId; const formData = new FormData(this.ui.employeeForm); const data = Object.fromEntries(formData.entries()); if (isEditing && !data.password) { delete data.password; } if (!data.birthDate) { delete data.birthDate; } else { data.birthDate = this.formatDateISO(new Date(data.birthDate + 'T00:00:00')); } if (!data.hireDate) { delete data.hireDate; } else { data.hireDate = this.formatDateISO(new Date(data.hireDate + 'T00:00:00')); } if (!data.photoUrl) delete data.photoUrl; const url = isEditing ? `/api/employees/${employeeId}` : '/api/employees'; const method = isEditing ? 'PUT' : 'POST'; console.log(`Salvando (${method}):`, data); if (!this.ui.btnSaveChangesEmployee) { console.error("Botão Salvar não encontrado."); return; } this.ui.btnSaveChangesEmployee.disabled = true; this.ui.btnSaveChangesEmployee.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Salvando...'; try { if (isEditing) delete data.email; delete data.id; const response = await this.fetchWithAuth(url, { method: method, body: JSON.stringify(data) }); if (!response) return; const result = await response.json(); if (!response.ok || !result.success) { const fieldError = result.error?.field ? ` (Campo: ${result.error.field})` : ''; throw new Error((result.message || `Erro ${response.status}`) + fieldError); } this.showAlert('success', `Funcionário ${isEditing ? 'atualizado' : 'cadastrado'}!`); if (this.ui.employeeFormModal) this.ui.employeeFormModal.hide(); else console.warn("employeeFormModal instance unavailable."); if (this.state.currentView === 'admin') { this.loadAndDisplayAdminEmployeeList(); } } catch (error) { if (error.message !== 'Não autorizado') { console.error("Erro salvar func:", error); if (this.ui.employeeFormError) { this.ui.employeeFormError.textContent = `Erro: ${error.message}`; this.ui.employeeFormError.style.display = 'block'; } } } finally { if (this.ui.btnSaveChangesEmployee) { this.ui.btnSaveChangesEmployee.disabled = false; this.ui.btnSaveChangesEmployee.innerHTML = isEditing ? 'Salvar Alterações' : 'Cadastrar Funcionário'; } } }
   _validateEmployeeForm() { const form = this.ui.employeeForm; if (!form) return false; form.classList.add('was-validated'); let isValid = form.checkValidity(); if (!this.ui.employeeId?.value && !this.ui.employeePassword?.value) { if (this.ui.employeePassword) { this.ui.employeePassword.classList.add('is-invalid'); this.ui.employeePassword.setCustomValidity("Senha obrigatória."); } isValid = false; } else { if (this.ui.employeePassword) { this.ui.employeePassword.setCustomValidity(""); if (!this.ui.employeeId?.value && this.ui.employeePassword.value && !this.ui.employeePassword.checkValidity()) { isValid = false; } else if (this.ui.employeeId?.value && this.ui.employeePassword.value && !this.ui.employeePassword.checkValidity()) { isValid = false; } else { if (this.ui.employeePassword.value === '' || this.ui.employeePassword.checkValidity()) { this.ui.employeePassword.classList.remove('is-invalid'); } } } } return isValid; }
-  async fetchWithAuth(url, options = {}) { console.log(`fetchWithAuth: ${options.method || 'GET'} ${url}`); const headers = { 'Content-Type': 'application/json', ...options.headers }; if (this.state.token) { headers['Authorization'] = `Bearer ${this.state.token}`; } else { console.warn("fetchWithAuth chamado sem token."); } try { const response = await fetch(url, { ...options, headers }); if (response.status === 401) { console.error("fetchWithAuth: Erro 401 - Não autorizado. Deslogando..."); this.showAlert('danger', 'Sessão inválida ou expirada. Faça login novamente.'); this.handleLogout(); return Promise.reject(new Error('Não autorizado')); } return response; } catch (networkError) { console.error(`fetchWithAuth: Erro de rede ou fetch para ${url}:`, networkError); this.showAlert('danger', `Erro de conexão ao tentar acessar a API. Verifique sua rede.`); return Promise.reject(networkError); } }
+  async fetchWithAuth(url, options = {}) {
+    console.log(`fetchWithAuth: ${options.method || 'GET'} ${url}`);
+    const headers = { 'Content-Type': 'application/json', ...options.headers };
+    // Lê o token DIRETAMENTE do localStorage a cada chamada
+    const token = localStorage.getItem('authToken');
+
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+      console.log(`[fetchWithAuth] Token Bearer encontrado e sendo enviado para ${url}`);
+    } else {
+      console.warn(`[fetchWithAuth] Token não encontrado no localStorage para ${url}. A requisição falhará se for protegida.`);
+      // Não rejeita a promessa aqui, deixa a API retornar 401 se necessário.
+    }
+
+    try {
+      const response = await fetch(url, { ...options, headers });
+      // Tratamento global para erro 401 (Não Autorizado)
+      if (response.status === 401) {
+        console.error("fetchWithAuth: Erro 401 - Não autorizado detectado. Deslogando...");
+        this.showAlert('danger', 'Sessão inválida ou expirada. Faça login novamente.');
+        this.handleLogout(); // Força o logout
+        return Promise.reject(new Error('Não autorizado')); // Rejeita a promessa para interromper
+      }
+      // Retorna a resposta para tratamento posterior (incluindo outros erros como 403, 404, 500)
+      return response;
+    } catch (networkError) {
+      console.error(`fetchWithAuth: Erro de rede ou fetch para ${url}:`, networkError);
+      this.showAlert('danger', `Erro de conexão ao tentar acessar a API. Verifique sua rede.`);
+      return Promise.reject(networkError); // Rejeita a promessa
+    }
+  }
   showAlert(type, message) { if (!this.ui.alertPlaceholder) { console.error("Placeholder de alerta não encontrado."); return; } const wrapper = document.createElement('div'); const alertId = `alert-${Date.now()}`; wrapper.innerHTML = `<div id="${alertId}" class="alert alert-${type} alert-dismissible fade show" role="alert">${message}<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button></div>`; this.ui.alertPlaceholder.append(wrapper); const alertElement = document.getElementById(alertId); if (alertElement && typeof bootstrap !== 'undefined' && bootstrap.Alert) { const bsAlert = bootstrap.Alert.getOrCreateInstance(alertElement); const timeoutId = setTimeout(() => { if (document.getElementById(alertId)) { bsAlert.close(); } }, 5000); alertElement.addEventListener('closed.bs.alert', () => { clearTimeout(timeoutId); wrapper.remove(); }, { once: true }); } else { console.error("Não foi possível encontrar o elemento do alerta ou bootstrap.Alert para auto-fechamento."); setTimeout(() => wrapper.remove(), 5500); } }
   formatTime(timestamp) { if (!timestamp) return '--:--'; try { const date = new Date(timestamp); if (isNaN(date.getTime())) return 'Inválido'; return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', hour12: false }); } catch (e) { console.error("Erro ao formatar data:", timestamp, e); return 'Erro'; } }
   getTipoNome(tipo) { const nomes = { 'check-in': 'Entrada', 'lunch-start': 'Saída Almoço', 'lunch-end': 'Retorno Almoço', 'check-out': 'Saída' }; return nomes[tipo] || tipo; }
