@@ -29,27 +29,7 @@ class BalanceService {
      * @returns {number|null} Saldo de horas (positivo/negativo) ou null se inválido/impossível calcular.
      */
     calculateDailyBalance(timeRecord, employee) {
-        if (!timeRecord || !employee || !timeRecord.totalHours || !employee.weeklyHours) {
-            logger.warn(`[BalanceService] Não foi possível calcular saldo diário (calculateDailyBalance). Dados incompletos para Record ID: ${timeRecord?.id}, Employee ID: ${employee?.id}`);
-            return null;
-        }
-        try {
-            const dailyGoal = this._calculateDailyGoal(parseFloat(employee.weeklyHours));
-            const workedHours = parseFloat(timeRecord.totalHours);
-
-            // Verifica se os números são válidos após parse
-            if (isNaN(dailyGoal) || isNaN(workedHours)) {
-                logger.warn(`[BalanceService] Erro ao calcular saldo diário (calculateDailyBalance): Meta ou horas trabalhadas inválidas para Record ID: ${timeRecord.id}`);
-                return null;
-            }
-
-            const dailyBalance = workedHours - dailyGoal;
-            // Retorna o saldo arredondado para 2 casas decimais
-            return parseFloat(dailyBalance.toFixed(2));
-        } catch (error) {
-            logger.error(`[BalanceService] Exceção em calculateDailyBalance para Record ID: ${timeRecord.id}`, error);
-            return null;
-        }
+        if (!timeRecord || !employee || !timeRecord.totalHours || !employee.weeklyHours) { logger.warn(`[BalanceService] Dados incompletos (calculateDailyBalance). Rec ID: ${timeRecord?.id}, Emp ID: ${employee?.id}`); return null; } try { const dailyGoal = this._calculateDailyGoal(parseFloat(employee.weeklyHours)); const workedHours = parseFloat(timeRecord.totalHours); if (isNaN(dailyGoal) || isNaN(workedHours)) { logger.warn(`[BalanceService] Meta/horas inválidas (calculateDailyBalance). Rec ID: ${timeRecord.id}`); return null; } const dailyBalance = workedHours - dailyGoal; return parseFloat(dailyBalance.toFixed(2)); } catch (error) { logger.error(`[BalanceService] Exceção em calculateDailyBalance. Rec ID: ${timeRecord.id}`, error); return null; }
 
     }
 
@@ -94,7 +74,7 @@ class BalanceService {
                     startTime: { [Op.gte]: dayStart, [Op.lt]: dayEnd },
                     endTime: { [Op.ne]: null } // Apenas finalizados
                 },
-                group: ['employeeId'], // Obrigatório para agregação SUM
+                group: ['employee_id'], // Obrigatório para agregação SUM
                 plain: true,
                 transaction
             });
