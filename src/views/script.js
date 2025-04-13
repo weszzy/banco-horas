@@ -18,7 +18,6 @@ class PontoApp {
     this.setView = this.setView.bind(this);
     this._updateView = this._updateView.bind(this);
     this.fetchAndUpdateDashboard = this.fetchAndUpdateDashboard.bind(this);
-    this.loadEmployeeListForAdmin = this.loadEmployeeListForAdmin.bind(this);
     this.registrarPonto = this.registrarPonto.bind(this);
     this.showProfileModal = this.showProfileModal.bind(this);
     this.showLoginModal = this.showLoginModal.bind(this);
@@ -769,8 +768,45 @@ class PontoApp {
 
   /** (Admin) Ativa/Desativa um funcionário a partir do botão no modal de perfil. */
   async toggleActiveStatusFromModal() { const employeeId = this.state.viewingEmployeeId; if (!employeeId || this.state.currentUser?.role !== 'admin') return; const profileStatusBadge = this.ui.profileModalBody?.querySelector('.badge'); const currentIsActive = profileStatusBadge?.classList.contains('bg-success'); const newStatus = !currentIsActive; const actionText = newStatus ? 'ativar' : 'desativar'; if (!confirm(`Confirmar ${actionText} ${employeeId}?`)) return; try { const response = await this.fetchWithAuth(`/api/employees/${employeeId}/status`, { method: 'PATCH', body: JSON.stringify({ isActive: newStatus }) }); if (!response) return; const result = await response.json(); if (!response.ok || !result.success) throw new Error(result.message || `Erro ${response.status}`); this.showAlert('success', `Funcionário ${actionText}do.`); this.showProfileModal(employeeId); if (this.state.currentView === 'admin') { this.loadAndDisplayAdminEmployeeList(); } } catch (error) { if (error.message !== 'Não autorizado') { console.error(`Erro ${actionText}:`, error); this.showAlert('danger', `Falha ${actionText}: ${error.message}`); } } }
-  async loadAndDisplayAdminEmployeeList() { if (this.state.currentUser?.role !== 'admin') return; if (!this.ui.employeeListTableBody) { console.error("Admin table body missing."); return; } this.ui.employeeListTableBody.innerHTML = `<tr><td colspan="6" class="text-center"><span class="spinner-border spinner-border-sm"></span> Carregando...</td></tr>`; try { const response = await this.fetchWithAuth('/api/employees?active=all'); if (!response) return; const result = await response.json(); if (!response.ok || !result.success) throw new Error(result.message || `Erro ${response.status}`); this.state.employeeList = result.data; this.renderAdminEmployeeTable(); } catch (error) { if (error.message !== 'Não autorizado') { console.error("Error loading admin list:", error); this.ui.employeeListTableBody.innerHTML = `<tr><td colspan="6" class="text-center text-danger">Erro: ${error.message}</td></tr>`; } } }
+  async loadAndDisplayAdminEmployeeList() {
+    if (this.state.currentUser?.role !== 'admin') return;
+    if (!this.ui.employeeListTableBody) {
+      console.error("Admin table body missing.");
+      return;
+    }
 
+    this.ui.employeeListTableBody.innerHTML = `<tr><td colspan="6" class="text-center"><span class="spinner-border spinner-border-sm"></span> Carregando funcionários...</td></tr>`;
+
+    try {
+      // URL SEM paginação
+      const url = '/api/employees?active=all'; // Ou apenas /api/employees se não precisar do filtro 'all'
+      const response = await this.fetchWithAuth(url);
+      if (!response) return;
+
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        // Se a resposta paginada foi mantida no backend por engano, pode dar erro aqui
+        if (result.data && result.data.pagination) {
+          throw new Error("API ainda está retornando dados paginados inesperadamente.");
+        }
+        throw new Error(result.message || `Erro ${response.status}`);
+      }
+
+      // Assume que result.data é a lista direta de funcionários agora
+      this.state.employeeList = result.data;
+
+      this.renderAdminEmployeeTable(); // Renderiza a tabela com todos
+      // NÃO renderiza controles de paginação
+      this._clearPaginationControls('adminPaginationControls');
+
+
+    } catch (error) {
+      if (error.message !== 'Não autorizado') {
+        console.error("Error loading admin list:", error);
+        this.ui.employeeListTableBody.innerHTML = `<tr><td colspan="6" class="text-center text-danger">Erro ao carregar funcionários: ${error.message}</td></tr>`;
+      }
+    }
+  }
 
 
   /** (Admin) Deleta um registro de ponto a partir do botão no modal de perfil (histórico). */
