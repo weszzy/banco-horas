@@ -797,7 +797,6 @@ class PontoApp {
 
       this.renderAdminEmployeeTable(); // Renderiza a tabela com todos
       // NÃO renderiza controles de paginação
-      this._clearPaginationControls('adminPaginationControls');
 
 
     } catch (error) {
