@@ -25,6 +25,7 @@ class PontoApp {
     this.handleSaveEmployeeForm = this.handleSaveEmployeeForm.bind(this);
     this.handleDeleteRecord = this.handleDeleteRecord.bind(this);
     this.handleZeroBalanceFromModal = this.handleZeroBalanceFromModal.bind(this);
+    this.handleAdjustBalanceSubmit = this.handleAdjustBalanceSubmit.bind(this);
   }
 
   /**
@@ -107,7 +108,18 @@ class PontoApp {
       btnLoginTrigger: document.getElementById('btnLoginTrigger'),
       btnLoginPromptTrigger: document.getElementById('btnLoginPromptTrigger'),
       btnNovoFuncAdminArea: document.getElementById('btnNovoFuncAdminArea'),
-      linkNovoFuncionarioOffcanvas: document.getElementById('linkNovoFuncionarioOffcanvas')
+      linkNovoFuncionarioOffcanvas: document.getElementById('linkNovoFuncionarioOffcanvas'),
+
+
+      adjustBalanceModalElement: document.getElementById('adjustBalanceModal'),
+      adjustBalanceModal: null, // Instância será criada
+      adjustBalanceEmployeeName: document.getElementById('adjustBalanceEmployeeName'),
+      adjustBalanceEmployeeId: document.getElementById('adjustBalanceEmployeeId'),
+      adjustBalanceForm: document.getElementById('adjustBalanceForm'),
+      adjustmentValue: document.getElementById('adjustmentValue'),
+      adjustmentReason: document.getElementById('adjustmentReason'),
+      adjustBalanceError: document.getElementById('adjustBalanceError'),
+      btnSubmitAdjustment: document.getElementById('btnSubmitAdjustment')
     };
 
     // Verifica se todos os elementos essenciais foram encontrados
@@ -261,11 +273,192 @@ class PontoApp {
         console.error("[Listeners] btnZeroBalance not found in profileModal.");
       }
 
+
+      // --- Adjust Balance Modal Listeners ---
+      const adjustModalElement = this.ui.adjustBalanceModalElement;
+      if (adjustModalElement) {
+        // Listener para preparar o modal quando ele for aberto
+        if (!adjustModalElement.listenerAttachedShow) {
+          adjustModalElement.addEventListener('show.bs.modal', (event) => {
+            // O botão que disparou o modal (btnAdjustBalanceTrigger) não contém o ID diretamente.
+            // Precisamos pegar o ID do funcionário que está sendo visualizado no modal de perfil.
+            const employeeId = this.state.viewingEmployeeId;
+            this.prepareAdjustBalanceForm(employeeId);
+          });
+          adjustModalElement.listenerAttachedShow = true;
+        }
+
+        // Listener para o botão de submit
+        const btnSubmit = this.ui.btnSubmitAdjustment;
+        if (btnSubmit && !btnSubmit.listenerAttached) {
+          btnSubmit.addEventListener('click', () => this.handleAdjustBalanceSubmit());
+          btnSubmit.listenerAttached = true;
+          console.log("[Listeners] Listener para btnSubmitAdjustment adicionado.");
+        } else if (!btnSubmit) {
+          console.error("[Listeners] btnSubmitAdjustment not found.");
+        }
+
+        // Listener para validação enquanto digita (opcional, mas melhora UX)
+        const adjValueInput = this.ui.adjustmentValue;
+        if (adjValueInput && !adjValueInput.listenerAttachedInput) {
+          adjValueInput.addEventListener('input', () => {
+            if (this.ui.adjustBalanceForm?.classList.contains('was-validated')) {
+              this._validateAdjustBalanceForm();
+            }
+          });
+          adjValueInput.listenerAttachedInput = true;
+        }
+      }
+
       // Listeners para botões delete na tabela são adicionados em renderProfileModalContent
     } else { console.error("[Listeners] profileModalElement not found."); }
     console.log("[Listeners] All modal event listeners set up.");
   }
 
+
+
+  /**
+     * Prepara o formulário de ajuste de saldo antes de exibir o modal.
+     * Define o nome e o ID do funcionário.
+     * @param {number} employeeId - O ID do funcionário cujo saldo será ajustado.
+     */
+  prepareAdjustBalanceForm(employeeId) {
+    const modal = this._ensureModalInstance('adjustBalanceModal');
+    if (!modal || !employeeId) {
+      console.error("Modal de ajuste ou ID do funcionário ausente.");
+      // Poderia fechar o modal aqui ou mostrar erro
+      return;
+    }
+
+    // Limpa o formulário e erros anteriores
+    if (this.ui.adjustBalanceForm) {
+      this.ui.adjustBalanceForm.reset();
+      this.ui.adjustBalanceForm.classList.remove('was-validated');
+    }
+    if (this.ui.adjustBalanceError) this.ui.adjustBalanceError.style.display = 'none';
+    if (this.ui.btnSubmitAdjustment) this.ui.btnSubmitAdjustment.disabled = false;
+
+    // Busca o nome do funcionário (pode pegar do estado ou do título do modal de perfil)
+    const employeeName = document.getElementById('profileModalLabel')?.textContent.replace('Perfil de ', '') || `ID ${employeeId}`;
+
+    // Define os valores no modal
+    if (this.ui.adjustBalanceEmployeeName) this.ui.adjustBalanceEmployeeName.textContent = employeeName;
+    if (this.ui.adjustBalanceEmployeeId) this.ui.adjustBalanceEmployeeId.value = employeeId;
+
+    console.log(`[AdjustBalance] Formulário preparado para Employee ID: ${employeeId}`);
+  }
+
+  /**
+  * Valida o formulário de ajuste de saldo.
+  * @returns {boolean} True se válido, false caso contrário.
+  */
+  _validateAdjustBalanceForm() {
+    const form = this.ui.adjustBalanceForm;
+    const valueInput = this.ui.adjustmentValue;
+    if (!form || !valueInput) return false;
+
+    form.classList.add('was-validated'); // Habilita feedback visual do Bootstrap
+
+    // Verifica validade padrão (required)
+    let isValid = form.checkValidity();
+
+    // Validação customizada: o valor não pode ser zero
+    const numValue = parseFloat(valueInput.value);
+    if (numValue === 0) {
+      valueInput.setCustomValidity("O valor de ajuste não pode ser zero."); // Mensagem de erro customizada
+      valueInput.classList.add('is-invalid'); // Força visualmente inválido
+      isValid = false;
+    } else if (isNaN(numValue)) {
+      valueInput.setCustomValidity("Forneça um número válido.");
+      valueInput.classList.add('is-invalid');
+      isValid = false;
+    }
+    else {
+      valueInput.setCustomValidity(""); // Limpa erro customizado se válido
+      // Não remove is-invalid aqui, deixa o checkValidity padrão tratar
+    }
+
+    return isValid;
+  }
+
+  /**
+  * Manipula o envio do formulário de ajuste manual de saldo.
+  */
+  async handleAdjustBalanceSubmit() {
+    const modalInstance = this.ui.adjustBalanceModal;
+    if (!modalInstance) { console.error("Instância do modal de ajuste não encontrada."); return; }
+
+    // Valida o formulário
+    if (!this._validateAdjustBalanceForm()) {
+      if (this.ui.adjustBalanceError) {
+        this.ui.adjustBalanceError.textContent = 'Por favor, corrija os erros no formulário.';
+        this.ui.adjustBalanceError.style.display = 'block';
+      }
+      return;
+    }
+    if (this.ui.adjustBalanceError) this.ui.adjustBalanceError.style.display = 'none'; // Limpa erro
+
+    const employeeId = this.ui.adjustBalanceEmployeeId.value;
+    const adjustmentValue = parseFloat(this.ui.adjustmentValue.value); // Já validado que não é NaN ou 0
+    const reason = this.ui.adjustmentReason.value.trim() || null; // Envia null se vazio
+
+    if (!employeeId) {
+      this.showAlert('danger', 'Erro: ID do funcionário não encontrado.');
+      return;
+    }
+
+    console.log(`[Admin Adjust] Enviando ajuste de ${adjustmentValue}h para Employee ID ${employeeId}. Razão: ${reason}`);
+    if (this.ui.btnSubmitAdjustment) this.ui.btnSubmitAdjustment.disabled = true;
+
+    try {
+      const url = `/api/employees/${employeeId}/adjust-balance`;
+      const payload = {
+        adjustment: adjustmentValue,
+        reason: reason
+      };
+      const response = await this.fetchWithAuth(url, { method: 'PATCH', body: JSON.stringify(payload) });
+
+      if (!response) return; // Erro tratado em fetchWithAuth
+
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || `Erro ${response.status}`);
+      }
+
+      this.showAlert('success', `Saldo ajustado com sucesso!`);
+      modalInstance.hide(); // Fecha o modal de ajuste
+
+      // --- Atualiza a UI (similar ao zeroBalance e deleteRecord) ---
+      const isProfileModalOpen = this.ui.profileModalElement?.classList.contains('show');
+      if (isProfileModalOpen && this.state.viewingEmployeeId === parseInt(employeeId, 10)) {
+        await this.showProfileModal(employeeId); // Reabre/recarrega o modal de perfil
+      }
+      if (this.state.currentView === 'admin') {
+        await this.loadAndDisplayAdminEmployeeList(); // Recarrega lista admin
+      }
+      if (this.state.currentView === 'dashboard' && this.state.selectedEmployeeId === parseInt(employeeId, 10)) {
+        await this.fetchAndUpdateSummary(); // Recarrega resumo dashboard
+      }
+
+    } catch (error) {
+      if (error.message !== 'Não autorizado') {
+        console.error(`Erro ao ajustar saldo para ${employeeId}:`, error);
+        // Mostra erro dentro do modal de ajuste
+        if (this.ui.adjustBalanceError) {
+          this.ui.adjustBalanceError.textContent = `Falha: ${error.message}`;
+          this.ui.adjustBalanceError.style.display = 'block';
+        } else {
+          this.showAlert('danger', `Falha ao ajustar saldo: ${error.message}`);
+        }
+      }
+    } finally {
+      if (this.ui.btnSubmitAdjustment) this.ui.btnSubmitAdjustment.disabled = false; // Reabilita botão
+    }
+  }
+
+
+
+  
   /**
        * Manipula o clique no botão "Zerar Saldo" dentro do modal de perfil.
        * Pede confirmação e chama a API para zerar o saldo do funcionário visualizado.
