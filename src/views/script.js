@@ -808,9 +808,63 @@ class PontoApp {
   }
 
 
-  /** (Admin) Deleta um registro de ponto a partir do botão no modal de perfil (histórico). */
-  async handleDeleteRecord(recordId, employeeIdToRefresh) { console.log(`[Admin] Deleting record ID: ${recordId}`); if (!this.state.currentUser || this.state.currentUser.role !== 'admin') { this.showAlert('danger', 'Permissão negada.'); return; } try { const response = await this.fetchWithAuth(`/api/time-records/${recordId}`, { method: 'DELETE' }); if (!response) return; const result = await response.json(); if (!response.ok || !result.success) { throw new Error(result.message || `Erro ${response.status}`); } this.showAlert('success', 'Registro removido.'); if (this.ui.profileModalElement?.classList.contains('show')) { this.showProfileModal(employeeIdToRefresh); } if (this.state.currentView === 'admin') { this.loadAndDisplayAdminEmployeeList(); } if (this.state.currentView === 'dashboard' && this.state.selectedEmployeeId === employeeIdToRefresh) { this.fetchAndUpdateSummary(); } } catch (error) { if (error.message !== 'Não autorizado') { console.error(`Error deleting record ${recordId}:`, error); this.showAlert('danger', `Falha ao remover: ${error.message}`); } } }
+  /** (Admin) Deleta um registro e ATUALIZA a visualização */
+  async handleDeleteRecord(recordId, employeeIdToRefresh) {
+    console.log(`[Admin] Deletando registro ID: ${recordId} e atualizando perfil ${employeeIdToRefresh}`);
+    if (!this.state.currentUser || this.state.currentUser.role !== 'admin') {
+      this.showAlert('danger', 'Permissão negada.');
+      return;
+    }
 
+    // Opcional: Desabilitar botão enquanto processa
+    const deleteButton = this.ui.profileModalBody?.querySelector(`button[data-record-id="${recordId}"]`);
+    if (deleteButton) deleteButton.disabled = true;
+
+    try {
+      const response = await this.fetchWithAuth(`/api/time-records/${recordId}`, { method: 'DELETE' });
+      if (!response) return; // fetchWithAuth trata erro de rede/401
+
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || `Erro ${response.status}`);
+      }
+
+      this.showAlert('success', 'Registro removido com sucesso. Atualizando perfil...');
+
+      // --- GARANTIR ATUALIZAÇÃO DA UI ---
+      // 1. Verifica se o modal de perfil está aberto e se é o do funcionário afetado
+      const profileModalInstance = this.ui.profileModal; // Pega instância cacheada (se existir)
+      const isProfileModalOpen = this.ui.profileModalElement?.classList.contains('show');
+
+      if (isProfileModalOpen && this.state.viewingEmployeeId === parseInt(employeeIdToRefresh, 10)) {
+        // Recarrega os dados do perfil para refletir o novo saldo e histórico
+        await this.showProfileModal(employeeIdToRefresh); // Reabre/recarrega o modal
+      } else {
+        console.log("[handleDeleteRecord] Modal de perfil não está aberto ou é de outro usuário. Não recarregando modal.");
+      }
+
+      // 2. Se a visão principal for 'admin', recarrega a lista geral (o saldo lá também deve atualizar)
+      if (this.state.currentView === 'admin') {
+        console.log("[handleDeleteRecord] Recarregando lista admin...");
+        await this.loadAndDisplayAdminEmployeeList(); // Atualiza a tabela principal
+      }
+
+      // 3. Se a visão principal for 'dashboard' e o funcionário afetado estava selecionado, atualiza o resumo
+      if (this.state.currentView === 'dashboard' && this.state.selectedEmployeeId === parseInt(employeeIdToRefresh, 10)) {
+        console.log("[handleDeleteRecord] Recarregando resumo do dashboard...");
+        await this.fetchAndUpdateSummary(); // Atualiza o card de saldo
+      }
+
+    } catch (error) {
+      if (error.message !== 'Não autorizado') {
+        console.error(`Error deleting record ${recordId}:`, error);
+        this.showAlert('danger', `Falha ao remover registro: ${error.message}`);
+      }
+    } finally {
+      // Reabilitar botão se necessário (mas o modal será recarregado, então talvez não precise)
+      if (deleteButton) deleteButton.disabled = false;
+    }
+  }
 
 
   /** Renderiza a tabela de funcionários na área de administração. */

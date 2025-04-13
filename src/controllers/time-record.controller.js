@@ -324,6 +324,27 @@ class TimeRecordController {
       balanceToRemove = parseFloat(balanceToRemove.toFixed(2)); // Garante arredondamento
       logger.info(`[Admin Action] Registro ${recordId} a ser removido (Employee ${employeeIdAffected}) tinha um saldo diário de ${balanceToRemove}h.`);
 
+
+      if (record.endTime && typeof record.totalHours === 'number') {
+        const employee = await Employee.findByPk(employeeIdAffected, { attributes: ['weeklyHours'], transaction });
+        if (employee) {
+          balanceToRemove = BalanceService.calculateDailyBalance(record, employee) ?? 0;
+          // **** LOG ADICIONAL ****
+          logger.debug(`[Admin Action Delete - Debug] Calculado balanceToRemove: ${balanceToRemove} para Record ID ${recordId}`);
+          // **** FIM LOG ADICIONAL ****
+        } else {
+          logger.warn(`[Admin Action] Funcionário ${employeeIdAffected} não encontrado ao tentar calcular saldo para remoção do registro ${recordId}. Saldo acumulado não será ajustado.`);
+          balanceToRemove = 0; // Garante que é zero se o funcionário não for encontrado
+        }
+      } else {
+        // **** LOG ADICIONAL ****
+        logger.debug(`[Admin Action Delete - Debug] Registro ${recordId} não finalizado ou sem totalHours. balanceToRemove será 0.`);
+        // **** FIM LOG ADICIONAL ****
+        balanceToRemove = 0;
+      }
+      balanceToRemove = parseFloat(balanceToRemove.toFixed(2));
+      logger.info(`[Admin Action] Registro ${recordId} a ser removido (Employee ${employeeIdAffected}) tinha um saldo diário de ${balanceToRemove}h.`);
+
       // --- Remoção e Ajuste de Saldo ---
       // 1. Remove o registro do banco de dados DENTRO da transação.
       await record.destroy({ transaction });
