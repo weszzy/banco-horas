@@ -71,6 +71,21 @@ body {
     /* Transição suave para dark mode */
 }
 
+/* Saldo Específico (Definido UMA VEZ, após :root ou estilos gerais) */
+.balance-positive {
+    color: var(--success);
+    /* Usar --success */
+}
+
+.balance-negative {
+    color: var(--danger);
+    /* Usar --danger */
+}
+
+.balance-zero {
+    color: var(--text-muted-light);
+    /* Usar --text-muted-light */
+}
 
 /* Links */
 a {
@@ -304,21 +319,6 @@ a:hover {
 }
 
 
-/* Saldo Específico (Mantido) */
-.balance-positive {
-    color: var(--success);
-}
-
-.balance-negative {
-    color: var(--danger);
-}
-
-.balance-zero {
-    color: var(--text-muted-light);
-}
-
-/* Usa muted */
-
 
 
 .main-container {
@@ -334,225 +334,6 @@ a:hover {
     right: 10px;
     z-index: 1100;
 }
-
-/* Estilos para o resumo do saldo */
-#summaryContent {
-    display: none;
-    /* Inicialmente escondido */
-    transition: opacity 0.3s ease;
-}
-
-#summaryBalanceMobile {
-    font-size: 2rem;
-    margin-bottom: 0.25rem;
-}
-
-.balance-positive {
-    color: var(--success-color);
-}
-
-.balance-negative {
-    color: var(--danger-color);
-}
-
-.balance-zero {
-    color: var(--secondary-color);
-}
-
-#summaryLoadingMobile .spinner-border {
-    width: 1.5rem;
-    height: 1.5rem;
-}
-
-/* Navbar */
-/* A área de login/logout pode precisar de ajuste de margem */
-#authArea .btn {
-    padding: 0.25rem 0.5rem;
-    /* Botão menor */
-    font-size: 0.875rem;
-}
-
-#authArea .navbar-text {
-    font-size: 0.9rem;
-    padding-right: 0.5rem !important;
-    /* Ajuste de espaçamento */
-}
-
-/* Offcanvas Menu */
-.offcanvas {
-    max-width: 80%;
-}
-
-@media (min-width: 576px) {
-    .offcanvas {
-        max-width: 300px;
-    }
-}
-
-.offcanvas .nav-link {
-    padding: 0.75rem 1rem;
-    color: rgba(255, 255, 255, 0.75);
-    display: flex;
-    /* Alinhar ícone e texto */
-    align-items: center;
-}
-
-.offcanvas .nav-link:hover,
-.offcanvas .nav-link.active {
-    color: #fff;
-    background-color: rgba(255, 255, 255, 0.1);
-    border-radius: 0.25rem;
-}
-
-.offcanvas .nav-separator {
-    /* Estilo dos separadores */
-    margin: 0.5rem 0;
-}
-
-/* Card de Resumo Rápido */
-#summaryBalanceMobile {
-    font-size: 2rem;
-    margin-bottom: 0.25rem;
-}
-
-#summaryLoadingMobile .spinner-border-sm {
-    width: 1.5rem;
-    /* Spinner um pouco maior */
-    height: 1.5rem;
-}
-
-.small {
-    font-size: 0.875em;
-}
-
-/* Card de Ações */
-#dashboardArea .card-header {
-    padding: 0.5rem 0.75rem;
-    /* Menos padding nos headers */
-}
-
-#dashboardArea .card-title {
-    font-size: 1rem;
-    /* Tamanho de título menor */
-}
-
-#dashboardArea .card-body {
-    padding: 0.75rem;
-}
-
-#dashboardArea .d-grid {
-    gap: 0.5rem !important;
-    /* Menor espaçamento entre botões */
-}
-
-#dashboardArea .btn-lg {
-    padding: 0.6rem 1rem;
-    /* Botões grandes um pouco menores */
-    font-size: 1.1rem;
-}
-
-#dashboardArea .btn i {
-    /* Ícones um pouco menores nos botões */
-    font-size: 0.9em;
-}
-
-/* Card de Status */
-#statusDetailsMobile .list-group-item {
-    padding: 0.4rem 0.25rem;
-    border: none;
-}
-
-#statusDetailsMobile .list-group-item strong {
-    margin-left: auto;
-    padding-left: 0.5rem;
-    font-weight: 600;
-    /* Deixa o valor mais destacado */
-}
-
-
-
-
-@media (max-width: 576px) {
-
-    #adminArea .table th:nth-child(2), #adminArea .table td:nth-child(2),
-    /* Esconde Email */
-    #adminArea .table th:nth-child(5), #adminArea .table td:nth-child(5) {
-        display: none;
-    }
-
-    /* Esconde Saldo */
-    #adminArea .table th:last-child, #adminArea .table td:last-child {
-        text-align: left;
-    }
-}
-
-/* Select2 */
-.select2-container--default .select2-selection--single {
-    height: calc(1.5em + 0.75rem + 2px);
-    padding: 0.375rem 0.75rem;
-    border: 1px solid #ced4da;
-    border-radius: 0.375rem;
-    display: flex;
-    align-items: center;
-}
-
-.select2-container--default .select2-selection--single .select2-selection__rendered {
-    line-height: 1.5;
-    padding-left: 0;
-    padding-right: 0;
-    width: calc(100% - 30px);
-}
-
-.select2-container--default .select2-selection--single .select2-selection__arrow {
-    height: calc(1.5em + 0.75rem);
-    position: absolute;
-    top: 1px;
-    right: 1px;
-    width: 20px;
-}
-
-.select2-container--open {
-    z-index: 1056;
-}
-
-/* Acima do modal */
-.select2-container .select2-selection--single .select2-selection__rendered {
-    padding-right: 25px;
-}
-
-/* Garante espaço para o X de limpar */
-
-/* Perfil Modal */
-#profileModalBody img.profile-photo {
-    max-width: 120px;
-    border-radius: 50%;
-    margin-bottom: 1rem;
-}
-
-#profileModalBody .balance-positive {
-    color: var(--success-color);
-}
-
-#profileModalBody .balance-negative {
-    color: var(--danger-color);
-}
-
-#profileModalBody .balance-zero {
-    color: var(--secondary-color);
-}
-
-#balanceHistoryTable th, #balanceHistoryTable td {
-    font-size: 0.85rem;
-    padding: 0.4rem;
-}
-
-/* Tabela de histórico menor ainda */
-#balanceHistoryTable td .btn-sm {
-    padding: 0.1rem 0.3rem;
-    font-size: 0.75rem;
-}
-
-/* Botão delete menor */
 
 /* Responsividade Geral */
 @media (max-width: 768px) {
@@ -596,6 +377,10 @@ body.dark-mode {
 /* Ajustes específicos para dark mode */
 body.dark-mode .navbar-toggler-icon {
     background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba(255, 255, 255, 0.8)' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e");
+}
+
+body.dark-mode .balance-zero {
+    color: var(--text-muted-dark-theme);
 }
 
 body.dark-mode .offcanvas {
