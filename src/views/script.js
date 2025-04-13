@@ -13,6 +13,7 @@ class PontoApp {
     this._cacheDOMElements();
     // Não inicializar modais ou listeners pesados aqui ainda.
 
+    this.toggleDarkMode = this.toggleDarkMode.bind(this);
     this.handleLogin = this.handleLogin.bind(this);
     this.handleLogout = this.handleLogout.bind(this);
     this.setView = this.setView.bind(this);
@@ -54,6 +55,7 @@ class PontoApp {
 
     this.ui = {
       // Elementos de Modais
+      darkModeToggle: document.getElementById('darkModeToggle'), // Cache do botão
       loginModalElement: document.getElementById('loginModal'),
       employeeFormModalElement: document.getElementById('employeeFormModal'),
       profileModalElement: document.getElementById('profileModal'),
@@ -191,10 +193,72 @@ class PontoApp {
     this._initializeComponents(); // Estado, Offcanvas
     this._setupStaticEventListeners(); // Listeners para botões fora de modais
     this._initSelect2(); // Configura o Select2 (se presente)
+    this.applyInitialTheme(); // <<<--- Aplica tema inicial ANTES de mostrar a view
     this._updateView(); // Define a visão inicial (login ou dashboard/admin)
     this._setupAllModalEventListeners(); // Configura listeners DENTRO dos modais (forms, etc.)
+    this._setupDarkModeToggleListener();
     console.log("[PontoApp Init] Aplicação pronta.");
   }
+
+
+
+  /** Configura o listener para o botão de alternar tema */
+  _setupDarkModeToggleListener() {
+    if (this.ui.darkModeToggle) {
+      this.ui.darkModeToggle.addEventListener('click', this.toggleDarkMode);
+      console.log("[Listeners] Dark mode toggle listener set up.");
+    } else {
+      console.warn("[Listeners] Dark mode toggle button not found.");
+    }
+  }
+
+  /** Verifica localStorage e preferência do sistema para definir o tema inicial */
+  applyInitialTheme() {
+    const savedTheme = localStorage.getItem('theme');
+    const systemPrefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    let currentTheme;
+
+    if (savedTheme) { // Prioriza tema salvo
+      currentTheme = savedTheme;
+    } else if (systemPrefersDark) { // Senão, usa preferência do sistema
+      currentTheme = 'dark';
+    } else { // Senão, padrão é claro
+      currentTheme = 'light';
+    }
+
+    console.log(`[Theme] Initial theme: ${currentTheme} (Saved: ${savedTheme}, SystemDark: ${systemPrefersDark})`);
+    this.setTheme(currentTheme);
+  }
+
+  /** Define o tema (adiciona/remove classe e atualiza botão/localStorage) */
+  setTheme(theme) { // theme = 'dark' ou 'light'
+    if (theme === 'dark') {
+      document.body.classList.add('dark-mode');
+      localStorage.setItem('theme', 'dark');
+      if (this.ui.darkModeToggle) { // Atualiza ícone
+        this.ui.darkModeToggle.innerHTML = '<i class="fas fa-sun"></i>';
+        this.ui.darkModeToggle.title = "Alternar para Tema Claro";
+      }
+    } else {
+      document.body.classList.remove('dark-mode');
+      localStorage.setItem('theme', 'light');
+      if (this.ui.darkModeToggle) { // Atualiza ícone
+        this.ui.darkModeToggle.innerHTML = '<i class="fas fa-moon"></i>';
+        this.ui.darkModeToggle.title = "Alternar para Tema Escuro";
+      }
+    }
+    this.state.currentTheme = theme; // Atualiza estado interno (opcional)
+    console.log(`[Theme] Theme set to: ${theme}`);
+  }
+
+  /** Chamado pelo clique no botão para alternar o tema */
+  toggleDarkMode() {
+    const isDarkMode = document.body.classList.contains('dark-mode');
+    this.setTheme(isDarkMode ? 'light' : 'dark');
+  }
+
+
+
 
   // Listeners para elementos estáticos fora dos modais
   _setupStaticEventListeners() {
