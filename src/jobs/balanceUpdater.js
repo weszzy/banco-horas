@@ -1,131 +1,120 @@
 // src/jobs/balanceUpdater.js
 const cron = require('node-cron');
-const { Employee } = require('../models/employee.model'); // Caminho correto
-const BalanceService = require('../services/balance.service'); // Caminho correto
-const logger = require('../utils/logger.util'); // Caminho correto
-// Importar Sequelize e Op se precisar de transações aqui (opcional para o job)
-// const { sequelize } = require('../config/database');
+const { Employee } = require('../models/employee.model');
+const BalanceService = require('../services/balance.service');
+const logger = require('../utils/logger.util');
 
-// Agenda a tarefa para rodar todo dia às 02:00 AM (ajuste o horário conforme necessário)
-const schedule = '0 2 * * *'; // '0 2 * * *' - Roda às 02:00 todo dia
+// --- Configuração do Agendamento ---
+// Define quando a tarefa será executada.
+// Formato Cron: 'segundo minuto hora dia-do-mes mes dia-da-semana'
+// Exemplos:
+// '* * * * * *' - Roda a cada segundo (NÃO USAR EM PRODUÇÃO!)
+// '0 * * * *'  - Roda a cada minuto (ex: 0 segundos, todo minuto)
+// '0 2 * * *'  - Roda todo dia às 02:00 da manhã.
+const schedule = '0 2 * * *'; // Executa diariamente às 2 da manhã
 
-let isTaskRunning = false; // Flag para evitar execução concorrente
+// Flag para prevenir execuções múltiplas se a tarefa anterior ainda estiver rodando.
+let isTaskRunning = false;
 
+/**
+ * Tarefa Agendada (Cron Job):
+ * Responsável por recalcular e atualizar o saldo de horas acumulado dos funcionários
+ * com base nos registros do dia anterior.
+ *
+ * Propósito Principal: Garantir a consistência do saldo acumulado, corrigindo eventuais
+ * falhas na atualização durante o check-out ou processando dias onde o funcionário
+ * pode não ter feito check-out.
+ */
 const balanceUpdateTask = cron.schedule(schedule, async () => {
+    // Verifica se a tarefa já está em execução
     if (isTaskRunning) {
-        logger.warn('[CronJob] Balance update task is already running. Skipping this cycle.');
+        logger.warn('[CronJob BalanceUpdater] Tarefa já em execução. Pulando este ciclo.');
         return;
     }
 
+    // Marca a tarefa como em execução
     isTaskRunning = true;
-    logger.info(`[CronJob] Iniciando atualização diária do saldo de horas (${new Date().toISOString()})...`);
+    const startTime = Date.now();
+    logger.info(`[CronJob BalanceUpdater] Iniciando execução (${new Date().toISOString()})...`);
 
-    // Obter a data de ONTEM para recalcular o saldo
+    // Define a data a ser processada: o dia anterior ao atual.
     const dateToProcess = new Date();
     dateToProcess.setDate(dateToProcess.getDate() - 1);
-    const dateString = dateToProcess.toISOString().split('T')[0]; // Formato YYYY-MM-DD
-
-    // Opcional: Criar uma transação se quiser que TUDO falhe se UM funcionário falhar
-    // const transaction = await sequelize.transaction();
+    const dateString = dateToProcess.toISOString().split('T')[0];
 
     try {
-        // Busca todos os funcionários ativos
+        // Busca todos os funcionários que estão ATIVOS.
         const activeEmployees = await Employee.findAll({
             where: { isActive: true },
-            // attributes: ['id'], // Só precisamos do ID
-            // transaction // Passar a transação se usar
+            attributes: ['id'], // Só precisamos do ID para processar
         });
 
         if (!activeEmployees || activeEmployees.length === 0) {
-            logger.info('[CronJob] Nenhum funcionário ativo encontrado para atualizar saldo.');
+            logger.info(`[CronJob BalanceUpdater] Nenhum funcionário ativo encontrado para processar na data ${dateString}.`);
             isTaskRunning = false;
-            // await transaction.commit(); // Commit mesmo se não houver funcionários
             return;
         }
 
-        logger.info(`[CronJob] Processando saldo para ${activeEmployees.length} funcionário(s) referente a ${dateString}...`);
+        logger.info(`[CronJob BalanceUpdater] Processando saldo para ${activeEmployees.length} funcionário(s) referente a ${dateString}...`);
 
-        // Itera e atualiza o saldo para cada funcionário
         let successCount = 0;
         let failureCount = 0;
+
+        // Itera sobre cada funcionário ativo.
+        // Usar um loop `for...of` com `await` dentro é mais seguro para não sobrecarregar
+        // o banco de dados do que usar `Promise.all` para muitos funcionários.
         for (const employee of activeEmployees) {
             try {
-                logger.debug(`[CronJob] Processando Employee ID ${employee.id} para data ${dateString}...`);
+                // 1. Calcula o saldo LÍQUIDO do funcionário para o dia anterior.
+                //    Esta função soma todas as horas trabalhadas finalizadas e subtrai a meta diária.
+                const dailyBalance = await BalanceService.calculateDailyBalanceForDate(employee.id, dateToProcess);
 
-                // 1. Calcula o saldo REALIZADO vs META para o dia anterior
-                //    calculateDailyBalanceForDate já considera todos os registros finalizados do dia.
-                const dailyBalance = await BalanceService.calculateDailyBalanceForDate(
-                    employee.id,
-                    dateToProcess // Passa o objeto Date
-                    //, transaction // Passar a transação se usar
-                );
-
-                logger.debug(`[CronJob] Saldo calculado para Employee ID ${employee.id} em ${dateString}: ${dailyBalance}h`);
-
-                // 2. ATUALIZA o saldo acumulado do funcionário SOMANDO o saldo do dia anterior.
-                //    Isso corrige possíveis inconsistências ou atualiza saldos de dias não fechados via check-out.
-                //    Se o saldo do dia foi 0 (sem trabalho ou meta=trabalho), o delta será 0.
-                const updated = await BalanceService.updateAccumulatedBalance(
-                    employee.id,
-                    dailyBalance // Passa o saldo calculado como delta
-                    // , transaction // Passar a transação se usar
-                );
+                // 2. ATUALIZA o saldo ACUMULADO do funcionário, adicionando o saldo do dia anterior.
+                //    A função `updateAccumulatedBalance` usa `increment` e é atômica.
+                const updated = await BalanceService.updateAccumulatedBalance(employee.id, dailyBalance);
 
                 if (updated) {
-                    logger.debug(`[CronJob] Saldo acumulado atualizado para Employee ID ${employee.id}.`);
+                    // Não precisa logar cada sucesso aqui para não poluir, o debug no service já faz isso.
                     successCount++;
                 } else {
-                    // updateAccumulatedBalance retorna false em caso de erro interno ou func. não encontrado
-                    logger.warn(`[CronJob] Falha silenciosa ao atualizar saldo acumulado para Employee ID ${employee.id}. BalanceService.updateAccumulatedBalance retornou false.`);
-                    // Não necessariamente um erro que deve parar tudo, mas logar é importante.
-                    // A falha pode ser pq o funcionário foi desativado entre o findAll e o update.
-                    failureCount++; // Conta como falha para o resumo
+                    // Loga se a atualização do saldo falhou (ex: funcionário ficou inativo entre o findAll e o update)
+                    logger.warn(`[CronJob BalanceUpdater] Falha silenciosa ao atualizar saldo acumulado para Employee ID ${employee.id} na data ${dateString}.`);
+                    failureCount++;
                 }
-
-                // Pequena pausa para não sobrecarregar (opcional)
-                // await new Promise(resolve => setTimeout(resolve, 50));
-
             } catch (innerError) {
-                // Loga erro para funcionário específico mas continua o loop
-                logger.error(`[CronJob] Erro ao processar saldo para Employee ID ${employee.id} na data ${dateString}:`, innerError);
+                // Captura e loga erros específicos do processamento de UM funcionário, mas continua o loop.
+                logger.error(`[CronJob BalanceUpdater] Erro ao processar saldo para Employee ID ${employee.id} na data ${dateString}:`, innerError);
                 failureCount++;
-                // Se estiver usando transação, pode querer revertê-la aqui e parar:
-                // await transaction.rollback();
-                // throw innerError; // Para parar o job inteiro
             }
-        }
+        } // Fim do loop for...of
 
-        // Se chegou aqui sem lançar erro (e sem transação ou com commit no final)
-        // await transaction.commit(); // Commit se usou transação e tudo correu bem
-
-        logger.info(`[CronJob] Atualização diária do saldo de horas concluída para ${dateString}. Sucesso: ${successCount}, Falhas: ${failureCount}.`);
+        const endTime = Date.now();
+        const duration = ((endTime - startTime) / 1000).toFixed(2);
+        logger.info(`[CronJob BalanceUpdater] Execução concluída para ${dateString}. Sucesso: ${successCount}, Falhas: ${failureCount}. Duração: ${duration}s.`);
 
     } catch (error) {
-        // Erro GERAL (ex: falha ao buscar funcionários, erro na transação)
-        logger.error(`[CronJob] Erro GERAL na tarefa de atualização de saldo para ${dateString}:`, error);
-        // try {
-        //     if (transaction && !transaction.finished) {
-        //         await transaction.rollback();
-        //         logger.info('[CronJob] Transação revertida devido a erro geral.');
-        //     }
-        // } catch (rollbackError) {
-        //     logger.error('[CronJob] Erro ao reverter transação:', rollbackError);
-        // }
+        // Captura erros GERAIS (ex: falha ao buscar funcionários no DB).
+        const endTime = Date.now();
+        const duration = ((endTime - startTime) / 1000).toFixed(2);
+        logger.error(`[CronJob BalanceUpdater] Erro GERAL na tarefa para ${dateString}. Duração até erro: ${duration}s. Erro:`, error);
     } finally {
-        isTaskRunning = false; // Libera a flag independentemente do resultado
+        // Libera a flag para permitir a próxima execução agendada.
+        isTaskRunning = false;
     }
 }, {
-    scheduled: false, // Não inicia automaticamente ao criar
-    timezone: "America/Sao_Paulo" // Defina seu fuso horário
+    scheduled: false, // A tarefa é criada mas NÃO inicia automaticamente. `startBalanceUpdater` deve ser chamada.
+    timezone: "America/Sao_Paulo" // IMPORTANTE: Defina o fuso horário correto para a execução do cron.
 });
 
-// Função para iniciar o job (será chamada em app.js ou server.js)
+// Função para iniciar o job (geralmente chamada uma vez na inicialização do servidor)
 const startBalanceUpdater = () => {
-    if (process.env.ENABLE_CRON_JOBS !== 'false') { // Permite desabilitar via .env
-        logger.info(`[CronJob] Agendando tarefa de atualização de saldo para rodar às '${schedule}' (Timezone: ${process.env.TZ || 'America/Sao_Paulo'}).`);
-        balanceUpdateTask.start();
+    // Permite desabilitar o job via variável de ambiente (útil para testes ou ambientes específicos)
+    if (process.env.ENABLE_CRON_JOBS !== 'false') {
+        logger.info(`[CronJob BalanceUpdater] Agendando tarefa para rodar com schedule '${schedule}' (Timezone: ${process.env.TZ || 'America/Sao_Paulo'}).`);
+        balanceUpdateTask.start(); // Inicia o agendamento do cron
+        logger.info(`[CronJob BalanceUpdater] Tarefa agendada e iniciada.`);
     } else {
-        logger.info('[CronJob] Atualização automática de saldo desabilitada via ENABLE_CRON_JOBS=false.');
+        logger.info('[CronJob BalanceUpdater] Atualização automática de saldo desabilitada via variável de ambiente ENABLE_CRON_JOBS=false.');
     }
 };
 
