@@ -341,56 +341,51 @@
                     </div>
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
                 </div>
+            </div>
+        </div>
+    </div>
 
-                <!-- ========= Ajuste Manual de Saldo ========= -->
-                <div class="modal fade" id="adjustBalanceModal" tabindex="-1" aria-labelledby="adjustBalanceModalLabel"
-                    aria-hidden="true">
-                    <div class="modal-dialog modal-dialog-centered">
-                        <div class="modal-content">
-                            <div class="modal-header">
-                                <h5 class="modal-title" id="adjustBalanceModalLabel">Ajustar Saldo Manualmente</h5>
-                                <button type="button" class="btn-close" data-bs-dismiss="modal"
-                                    aria-label="Close"></button>
-                            </div>
-                            <div class="modal-body">
-                                <p>Funcionário: <strong id="adjustBalanceEmployeeName"></strong></p>
-                                <form id="adjustBalanceForm" novalidate>
-                                    <!-- Input oculto para guardar o ID do funcionário -->
-                                    <input type="hidden" id="adjustBalanceEmployeeId">
-
-                                    <div class="mb-3">
-                                        <label for="adjustmentValue" class="form-label">Valor do Ajuste
-                                            (Horas)</label>
-                                        <input type="number" step="0.01" class="form-control" id="adjustmentValue"
-                                            name="adjustment" required
-                                            placeholder="Ex: 1.5 (adicionar) ou -2.0 (remover)">
-                                        <div class="invalid-feedback">Forneça um valor numérico válido (use ponto
-                                            para decimais).</div>
-                                        <div class="form-text">Use valores positivos para adicionar horas ao saldo e
-                                            negativos para remover.</div>
-                                    </div>
-
-                                    <div class="mb-3">
-                                        <label for="adjustmentReason" class="form-label">Motivo (Opcional)</label>
-                                        <textarea class="form-control" id="adjustmentReason" name="reason" rows="2"
-                                            placeholder="Ex: Compensação hora extra dia X, Esquecimento registro..."></textarea>
-                                    </div>
-
-                                    <div class="alert alert-danger mt-3" role="alert" id="adjustBalanceError"
-                                        style="display: none;"></div>
-                                </form>
-                            </div>
-                            <div class="modal-footer">
-                                <button type="button" class="btn btn-secondary"
-                                    data-bs-dismiss="modal">Cancelar</button>
-                                <button type="button" class="btn btn-primary" id="btnSubmitAdjustment">Aplicar
-                                    Ajuste</button>
-                            </div>
-                        </div>
-                    </div>
+    <!-- ========= Ajuste Manual de Saldo ========= -->
+    <div class="modal fade" id="adjustBalanceModal" tabindex="-1" aria-labelledby="adjustBalanceModalLabel"
+        aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="adjustBalanceModalLabel">Ajustar Saldo Manualmente</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
+                <div class="modal-body">
+                    <p>Funcionário: <strong id="adjustBalanceEmployeeName"></strong></p>
+                    <form id="adjustBalanceForm" novalidate>
+                        <!-- Input oculto para guardar o ID do funcionário -->
+                        <input type="hidden" id="adjustBalanceEmployeeId">
 
+                        <div class="mb-3">
+                            <label for="adjustmentValue" class="form-label">Valor do Ajuste
+                                (Horas)</label>
+                            <input type="number" step="0.01" class="form-control" id="adjustmentValue" name="adjustment"
+                                required placeholder="Ex: 1.5 (adicionar) ou -2.0 (remover)">
+                            <div class="invalid-feedback">Forneça um valor numérico válido (use ponto
+                                para decimais).</div>
+                            <div class="form-text">Use valores positivos para adicionar horas ao saldo e
+                                negativos para remover.</div>
+                        </div>
 
+                        <div class="mb-3">
+                            <label for="adjustmentReason" class="form-label">Motivo (Opcional)</label>
+                            <textarea class="form-control" id="adjustmentReason" name="reason" rows="2"
+                                placeholder="Ex: Compensação hora extra dia X, Esquecimento registro..."></textarea>
+                        </div>
+
+                        <div class="alert alert-danger mt-3" role="alert" id="adjustBalanceError"
+                            style="display: none;"></div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" id="btnSubmitAdjustment">Aplicar
+                        Ajuste</button>
+                </div>
             </div>
         </div>
     </div>
