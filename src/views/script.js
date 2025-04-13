@@ -434,6 +434,35 @@ class PontoApp {
       // O listener 'hidden.bs.modal' adicionado em _ensureModalInstance
       // cuidará de chamar o reset do formulário automaticamente após o fechamento.
 
+
+      // 2. ATUALIZA A UI DEPOIS QUE O MODAL FECHOU (ou pelo menos o comando hide foi dado)
+      // Verifica se o modal de perfil estava aberto ANTES de fecharmos o de ajuste
+      // (Pode ser que o usuário tenha fechado o de perfil enquanto o de ajuste estava aberto)
+      // Usar uma flag ou checar o estado ANTES pode ser mais robusto, mas vamos tentar assim primeiro.
+      const profileModalElement = this.ui.profileModalElement; // Pega o elemento DOM
+      const isProfileModalCurrentlyDisplayed = profileModalElement?.classList.contains('show');
+
+      if (isProfileModalCurrentlyDisplayed && this.state.viewingEmployeeId === parseInt(employeeId, 10)) {
+        console.log("[AdjustBalance] Recarregando modal de perfil...");
+        // Espera um pouco para garantir que o modal de ajuste fechou antes de reabrir o de perfil
+        // Isso pode evitar alguns glitches visuais com os backdrops. Ajuste o tempo se necessário.
+        await new Promise(resolve => setTimeout(resolve, 200));
+        await this.showProfileModal(employeeId);
+      } else {
+        console.log("[AdjustBalance] Modal de perfil não estava aberto ou é de outro usuário. Não recarregando modal.");
+        // Se o modal de perfil não estava aberto, talvez ainda queiramos atualizar
+        // o resumo do dashboard ou a lista admin se estiverem visíveis.
+        if (this.state.currentView === 'admin') {
+          console.log("[AdjustBalance] Recarregando lista admin (modal perfil não estava aberto)...");
+          await this.loadAndDisplayAdminEmployeeList();
+        }
+        if (this.state.currentView === 'dashboard' && this.state.selectedEmployeeId === parseInt(employeeId, 10)) {
+          console.log("[AdjustBalance] Recarregando resumo dashboard (modal perfil não estava aberto)...");
+          await this.fetchAndUpdateSummary();
+        }
+      }
+
+
       // --- Atualiza a UI (similar ao zeroBalance e deleteRecord) ---
       const isProfileModalOpen = this.ui.profileModalElement?.classList.contains('show');
       if (isProfileModalOpen && this.state.viewingEmployeeId === parseInt(employeeId, 10)) {
