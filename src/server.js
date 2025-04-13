@@ -27,8 +27,8 @@ app.use(
                 ...helmet.contentSecurityPolicy.getDefaultDirectives(), // Usa os padrões do Helmet
                 // Permissões específicas para o frontend servido:
                 "script-src": ["'self'", "code.jquery.com", "cdn.jsdelivr.net"], // Scripts do próprio domínio e CDNs confiáveis
-                "style-src": ["'self'", "'unsafe-inline'", "cdn.jsdelivr.net", "cdnjs.cloudflare.com"], // Estilos do próprio domínio, inline (para compatibilidade legada/bootstrap) e CDNs
-                "font-src": ["'self'", "cdnjs.cloudflare.com"], // Fontes do próprio domínio e FontAwesome CDN
+                "style-src": ["'self'", "'unsafe-inline'", "cdn.jsdelivr.net", "cdnjs.cloudflare.com", "fonts.googleapis.com"], // Estilos do próprio domínio, inline (para compatibilidade legada/bootstrap) e CDNs
+                "font-src": ["'self'", "cdnjs.cloudflare.com", "fonts.gstatic.com"], // Fontes do próprio domínio e FontAwesome CDN
                 "img-src": ["'self'", "data:", "pbs.twimg.com"], // Imagens: próprio domínio, data URIs, e exemplo (Twitter) - Adicionar outros CDNs/Storage se necessário
                 // PERIGO: 'unsafe-inline' para atributos como 'onerror'.
                 // Idealmente, eventos inline devem ser removidos e adicionados via JS.
