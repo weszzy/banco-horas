@@ -24,6 +24,7 @@ class PontoApp {
     this.showEmployeeFormModal = this.showEmployeeFormModal.bind(this);
     this.handleSaveEmployeeForm = this.handleSaveEmployeeForm.bind(this);
     this.handleDeleteRecord = this.handleDeleteRecord.bind(this);
+    this.handleZeroBalanceFromModal = this.handleZeroBalanceFromModal.bind(this);
   }
 
   /**
@@ -245,14 +246,90 @@ class PontoApp {
     if (profileModalElement) {
       const btnEdit = profileModalElement.querySelector('#btnEditProfile');
       const btnToggle = profileModalElement.querySelector('#btnToggleActiveStatus');
+      const btnZeroBalance = profileModalElement.querySelector('#btnZeroBalance');
       if (btnEdit && !btnEdit.listenerAttached) { btnEdit.addEventListener('click', () => this.editProfileFromModal()); btnEdit.listenerAttached = true; }
       else if (!btnEdit) { console.error("[Listeners] btnEditProfile not found in profileModal."); }
       if (btnToggle && !btnToggle.listenerAttached) { btnToggle.addEventListener('click', () => this.toggleActiveStatusFromModal()); btnToggle.listenerAttached = true; }
       else if (!btnToggle) { console.error("[Listeners] btnToggleActiveStatus not found in profileModal."); }
+
+      // Adiciona listener para o botão Zerar Saldo
+      if (btnZeroBalance && !btnZeroBalance.listenerAttached) {
+        btnZeroBalance.addEventListener('click', () => this.handleZeroBalanceFromModal());
+        btnZeroBalance.listenerAttached = true;
+        console.log("[Listeners] Listener para btnZeroBalance adicionado.");
+      } else if (!btnZeroBalance) {
+        console.error("[Listeners] btnZeroBalance not found in profileModal.");
+      }
+
       // Listeners para botões delete na tabela são adicionados em renderProfileModalContent
     } else { console.error("[Listeners] profileModalElement not found."); }
     console.log("[Listeners] All modal event listeners set up.");
   }
+
+  /**
+       * Manipula o clique no botão "Zerar Saldo" dentro do modal de perfil.
+       * Pede confirmação e chama a API para zerar o saldo do funcionário visualizado.
+       */
+  async handleZeroBalanceFromModal() {
+    const employeeId = this.state.viewingEmployeeId; // Pega o ID do funcionário que está sendo visto no modal
+    if (!employeeId || this.state.currentUser?.role !== 'admin') {
+      this.showAlert('warning', 'Ação não permitida ou funcionário inválido.');
+      return;
+    }
+
+    // Busca o nome para a confirmação
+    const employeeName = document.getElementById('profileModalLabel')?.textContent.replace('Perfil de ', '') || `ID ${employeeId}`;
+
+    // Confirmação crucial!
+    if (!confirm(`Tem certeza que deseja ZERAR o saldo de horas de ${employeeName}? Esta ação não pode ser desfeita facilmente.`)) {
+      return;
+    }
+
+    console.log(`[Admin] Tentando zerar saldo para Employee ID: ${employeeId}`);
+    const zeroButton = this.ui.profileModalElement?.querySelector('#btnZeroBalance');
+    if (zeroButton) zeroButton.disabled = true; // Desabilita botão durante a ação
+
+    try {
+      const url = `/api/employees/${employeeId}/zero-balance`;
+      const response = await this.fetchWithAuth(url, { method: 'PATCH' }); // Usa PATCH
+
+      if (!response) return; // fetchWithAuth trata 401/erros de rede
+
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || `Erro ${response.status}`);
+      }
+
+      this.showAlert('success', `Saldo de ${employeeName} zerado com sucesso!`);
+
+      // --- Atualiza a UI ---
+      // 1. Recarrega os dados do modal de perfil para mostrar o saldo zerado
+      //    Verifica se o modal ainda está aberto e se é do mesmo usuário
+      const isProfileModalOpen = this.ui.profileModalElement?.classList.contains('show');
+      if (isProfileModalOpen && this.state.viewingEmployeeId === employeeId) {
+        await this.showProfileModal(employeeId); // Reabre/recarrega o modal
+      }
+
+      // 2. Se a visão atual for 'admin', recarrega a lista para mostrar o saldo zerado lá também
+      if (this.state.currentView === 'admin') {
+        await this.loadAndDisplayAdminEmployeeList();
+      }
+
+      // 3. Se a visão atual for 'dashboard' e o funcionário afetado estava selecionado, atualiza o resumo
+      if (this.state.currentView === 'dashboard' && this.state.selectedEmployeeId === employeeId) {
+        await this.fetchAndUpdateSummary();
+      }
+
+    } catch (error) {
+      if (error.message !== 'Não autorizado') {
+        console.error(`Erro ao zerar saldo para ${employeeId}:`, error);
+        this.showAlert('danger', `Falha ao zerar saldo: ${error.message}`);
+      }
+    } finally {
+      if (zeroButton) zeroButton.disabled = false; // Reabilita o botão
+    }
+  }
+
 
 
   /**
@@ -453,10 +530,10 @@ class PontoApp {
 
 
   /**
- * Atualiza a interface do usuário (Navbar, Offcanvas, Visão Principal)
- * com base no estado de autenticação (token e currentUser).
- * Chamado após login, logout ou na inicialização.
- */
+  * Atualiza a interface do usuário (Navbar, Offcanvas, Visão Principal)
+  * com base no estado de autenticação (token e currentUser).
+  * Chamado após login, logout ou na inicialização.
+  */
   _updateView() { console.log("Updating view based on auth state..."); if (this.state.token && this.state.currentUser) { if (this.ui.navLinksOffcanvas) this.ui.navLinksOffcanvas.style.display = 'block'; else console.error("navLinksOffcanvas missing"); if (this.ui.navLogoutOffcanvas) this.ui.navLogoutOffcanvas.style.display = 'block'; else console.error("navLogoutOffcanvas missing"); if (this.ui.authArea) { this.ui.authArea.innerHTML = `<span class="navbar-text me-3 small text-white-50">Olá, ${this.state.currentUser.fullName.split(' ')[0]}</span>`; } else { console.error("authArea missing"); } if (this.state.currentUser.role === 'admin') { if (this.ui.navAdminLinksOffcanvas) this.ui.navAdminLinksOffcanvas.style.display = 'block'; else console.error("navAdminLinksOffcanvas missing"); if (this.ui.navAdminSeparatorOffcanvas) this.ui.navAdminSeparatorOffcanvas.style.display = 'block'; else console.error("navAdminSeparatorOffcanvas missing"); if (this.ui.employeeSelectContainerMobile) this.ui.employeeSelectContainerMobile.style.display = 'block'; if (this.ui.employeeSelectMobile?.length > 0) this.ui.employeeSelectMobile.prop('disabled', false); this.setView(this.state.currentView !== 'login' ? this.state.currentView : 'dashboard'); } else { if (this.ui.navAdminLinksOffcanvas) this.ui.navAdminLinksOffcanvas.style.display = 'none'; if (this.ui.navAdminSeparatorOffcanvas) this.ui.navAdminSeparatorOffcanvas.style.display = 'none'; if (this.ui.employeeSelectContainerMobile) this.ui.employeeSelectContainerMobile.style.display = 'none'; if (this.ui.employeeSelectMobile?.length > 0) this.ui.employeeSelectMobile.prop('disabled', true); this.setView('dashboard'); } setTimeout(() => this._setupDynamicEventListeners(), 0); } else { if (this.ui.navLinksOffcanvas) this.ui.navLinksOffcanvas.style.display = 'none'; if (this.ui.navAdminLinksOffcanvas) this.ui.navAdminLinksOffcanvas.style.display = 'none'; if (this.ui.navAdminSeparatorOffcanvas) this.ui.navAdminSeparatorOffcanvas.style.display = 'none'; if (this.ui.navLogoutOffcanvas) this.ui.navLogoutOffcanvas.style.display = 'none'; if (this.ui.authArea) { this.ui.authArea.innerHTML = `<button class="btn btn-primary btn-sm" id="btnLoginTrigger">Login</button>`; } this.setView('login'); setTimeout(() => this._setupDynamicEventListeners(), 0); } console.log("View update process finished."); }
 
 
@@ -690,17 +767,69 @@ class PontoApp {
 
     // Verifica se o usuário logado é admin (para mostrar botões de ação no histórico)
     const isAdmin = this.state.currentUser?.role === 'admin';
+    const adminActionsContainer = this.ui.profileModalElement?.querySelector('#profileAdminActions');
+
+    if (adminActionsContainer && isAdmin) {
+      adminActionsContainer.style.display = 'block'; // Mostra o container de ações
+
+      // Botão Ativar/Desativar
+      const toggleBtn = adminActionsContainer.querySelector('#btnToggleActiveStatus');
+      if (toggleBtn) {
+        if (employee.isActive) {
+          toggleBtn.innerHTML = '<i class="fas fa-power-off me-1"></i> Desativar';
+          toggleBtn.classList.remove('btn-success');
+          toggleBtn.classList.add('btn-danger');
+        } else {
+          toggleBtn.innerHTML = '<i class="fas fa-power-off me-1"></i> Ativar';
+          toggleBtn.classList.remove('btn-danger');
+          toggleBtn.classList.add('btn-success');
+        }
+      }
+
+      // Botão Zerar Saldo (apenas garante que esteja visível se for admin)
+      const zeroBtn = adminActionsContainer.querySelector('#btnZeroBalance');
+      if (zeroBtn) {
+        // Habilitar/desabilitar baseado em alguma condição se necessário
+        // zeroBtn.disabled = (employee.id === this.state.currentUser.id); // Ex: Não zerar próprio saldo
+      }
+
+    } else if (adminActionsContainer) {
+      adminActionsContainer.style.display = 'none'; // Esconde para não-admins
+    }
 
     try {
       // ... (cálculo de idade, formatação de saldo como antes) ...
       let age = 'N/A';
-      if (employee.birthDate) { /* ... cálculo idade ... */ }
+      if (employee.birthDate) {
+        try {
+          const birthDate = new Date(employee.birthDate);
+          const today = new Date();
+          age = today.getFullYear() - birthDate.getFullYear();
+          if (today.getMonth() < birthDate.getMonth() ||
+            (today.getMonth() === birthDate.getMonth() && today.getDate() < birthDate.getDate())) {
+            age--;
+          }
+        } catch {
+          age = 'Inválida';
+        }
+      }
+
+      // Formata saldo
       const balance = parseFloat(employee.hourBalance || 0);
-      const formattedBalance = balance.toLocaleString('pt-BR', { /*...*/ });
+      const formattedBalance = balance.toLocaleString('pt-BR', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      });
+
       let balanceText = `${formattedBalance}h`;
       let balanceClass = 'balance-zero';
-      if (balance > 0.01) { balanceText = `+${balanceText}`; balanceClass = 'balance-positive'; }
-      else if (balance < -0.01) { balanceClass = 'balance-negative'; }
+
+      if (balance > 0.01) {
+        balanceText = `+${balanceText}`;
+        balanceClass = 'balance-positive';
+      } else if (balance < -0.01) {
+        balanceClass = 'balance-negative';
+      }
 
 
       // Prepara histórico - AGORA INCLUINDO AÇÕES PARA ADMIN
@@ -847,7 +976,7 @@ class PontoApp {
         if (result.data && result.data.pagination) {
           throw new Error("API ainda está retornando dados paginados inesperadamente.");
         }
-        throw new Error(result.message || `Erro ${response.status}`); 
+        throw new Error(result.message || `Erro ${response.status}`);
       }
 
       // Assume que result.data é a lista direta de funcionários agora
