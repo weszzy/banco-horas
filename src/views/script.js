@@ -493,9 +493,67 @@ class PontoApp {
 
 
   /** Ponto de entrada para atualizar todo o dashboard (status e resumo). */
-  async fetchAndUpdateDashboard() { if (!this.state.currentUser) { console.warn("fetchAndUpdateDashboard: currentUser is null."); return; } console.log("Updating Dashboard..."); this.resetDashboardState(); let initialEmployeeId = this.state.currentUser.id; if (this.state.currentUser.role === 'admin') { if (this.ui.employeeSelectContainerMobile) this.ui.employeeSelectContainerMobile.style.display = 'block'; if (this.ui.employeeSelectMobile?.length > 0) this.ui.employeeSelectMobile.prop('disabled', false); await this.loadEmployeeListForAdmin(); initialEmployeeId = this.ui.employeeSelectMobile?.length > 0 ? (parseInt(this.ui.employeeSelectMobile.val(), 10) || this.state.currentUser.id) : this.state.currentUser.id; } else { if (this.ui.employeeSelectContainerMobile) this.ui.employeeSelectContainerMobile.style.display = 'none'; if (this.ui.employeeSelectMobile?.length > 0) this.ui.employeeSelectMobile.prop('disabled', true); initialEmployeeId = this.state.currentUser.id; } this.state.selectedEmployeeId = initialEmployeeId; if (this.ui.employeeSelectMobile?.length > 0) { this.ui.employeeSelectMobile.val(this.state.selectedEmployeeId).trigger('change.select2'); } if (this.ui.actionUserName) { this.ui.actionUserName.textContent = `Para: ${this.state.currentUser.id === this.state.selectedEmployeeId ? 'Você' : (this.state.employeeList.find(e => e.id === this.state.selectedEmployeeId)?.fullName || 'Desconhecido')}`; } await this.fetchAndUpdateStatus(); await this.fetchAndUpdateSummary(); }
+  async fetchAndUpdateDashboard() {
+    if (!this.state.currentUser) { console.warn("fetchAndUpdateDashboard: currentUser is null."); return; }
+    console.log("Updating Dashboard...");
+    this.resetDashboardState(); // Limpa a UI
+    let initialEmployeeId = this.state.currentUser.id;
 
+    if (this.state.currentUser.role === 'admin') {
+      if (this.ui.employeeSelectContainerMobile) this.ui.employeeSelectContainerMobile.style.display = 'block';
+      if (this.ui.employeeSelectMobile?.length > 0) this.ui.employeeSelectMobile.prop('disabled', false);
 
+      // REMOVA ou COMENTE a linha abaixo - a lista admin só carrega na view 'admin'
+      // await this.loadEmployeeListForAdmin(); // <<<------ REMOVER/COMENTAR
+
+      // A lógica abaixo para popular o select ainda pode ser útil se você
+      // quiser que o admin possa *selecionar* outro usuário mesmo na view dashboard,
+      // mas a *lista completa* só carrega na view admin.
+      // Se this.state.employeeList ainda não foi carregada, o select ficará vazio inicialmente.
+      if (this.ui.employeeSelectMobile?.length > 0) {
+        this.populateEmployeeSelect(); // Função para popular o select (se necessário)
+      }
+
+      // Define o ID selecionado inicial (pode ser o próprio admin ou o que estava selecionado)
+      initialEmployeeId = this.ui.employeeSelectMobile?.length > 0
+        ? (parseInt(this.ui.employeeSelectMobile.val(), 10) || this.state.currentUser.id)
+        : this.state.currentUser.id;
+    } else {
+      // Lógica para não-admin (esconde select, etc.)
+      if (this.ui.employeeSelectContainerMobile) this.ui.employeeSelectContainerMobile.style.display = 'none';
+      if (this.ui.employeeSelectMobile?.length > 0) this.ui.employeeSelectMobile.prop('disabled', true);
+      initialEmployeeId = this.state.currentUser.id;
+    }
+
+    this.state.selectedEmployeeId = initialEmployeeId;
+
+    // Atualiza o select visualmente e o texto "Para: ..."
+    if (this.ui.employeeSelectMobile?.length > 0) {
+      this.ui.employeeSelectMobile.val(this.state.selectedEmployeeId).trigger('change.select2');
+    }
+    if (this.ui.actionUserName) {
+      // A lista pode não estar carregada aqui, busca pelo ID selecionado se necessário
+      const selectedName = this.state.employeeList.find(e => e.id === this.state.selectedEmployeeId)?.fullName;
+      this.ui.actionUserName.textContent = `Para: ${this.state.currentUser.id === this.state.selectedEmployeeId ? 'Você' : (selectedName || `ID ${this.state.selectedEmployeeId}`)}`;
+    }
+
+    // Busca status e resumo para o funcionário selecionado
+    await this.fetchAndUpdateStatus();
+    await this.fetchAndUpdateSummary();
+  }
+
+  populateEmployeeSelect() {
+    if (this.ui.employeeSelectMobile?.length > 0 && this.state.employeeList.length > 0) {
+      const select = this.ui.employeeSelectMobile;
+      select.empty(); // Limpa opções antigas
+      select.append(new Option('', '')); // Opção vazia para placeholder
+      this.state.employeeList.forEach(emp => {
+        const option = new Option(`${emp.fullName} (${emp.email})`, emp.id, false, emp.id === this.state.selectedEmployeeId);
+        select.append(option);
+      });
+      select.val(this.state.selectedEmployeeId).trigger('change.select2'); // Define o valor atual
+    }
+  }
 
 
   /** Manipula a mudança de seleção no dropdown de funcionários (admin). */
@@ -768,6 +826,8 @@ class PontoApp {
 
   /** (Admin) Ativa/Desativa um funcionário a partir do botão no modal de perfil. */
   async toggleActiveStatusFromModal() { const employeeId = this.state.viewingEmployeeId; if (!employeeId || this.state.currentUser?.role !== 'admin') return; const profileStatusBadge = this.ui.profileModalBody?.querySelector('.badge'); const currentIsActive = profileStatusBadge?.classList.contains('bg-success'); const newStatus = !currentIsActive; const actionText = newStatus ? 'ativar' : 'desativar'; if (!confirm(`Confirmar ${actionText} ${employeeId}?`)) return; try { const response = await this.fetchWithAuth(`/api/employees/${employeeId}/status`, { method: 'PATCH', body: JSON.stringify({ isActive: newStatus }) }); if (!response) return; const result = await response.json(); if (!response.ok || !result.success) throw new Error(result.message || `Erro ${response.status}`); this.showAlert('success', `Funcionário ${actionText}do.`); this.showProfileModal(employeeId); if (this.state.currentView === 'admin') { this.loadAndDisplayAdminEmployeeList(); } } catch (error) { if (error.message !== 'Não autorizado') { console.error(`Erro ${actionText}:`, error); this.showAlert('danger', `Falha ${actionText}: ${error.message}`); } } }
+
+
   async loadAndDisplayAdminEmployeeList() {
     if (this.state.currentUser?.role !== 'admin') return;
     if (!this.ui.employeeListTableBody) {
@@ -778,18 +838,16 @@ class PontoApp {
     this.ui.employeeListTableBody.innerHTML = `<tr><td colspan="6" class="text-center"><span class="spinner-border spinner-border-sm"></span> Carregando funcionários...</td></tr>`;
 
     try {
-      // URL SEM paginação
-      const url = '/api/employees?active=all'; // Ou apenas /api/employees se não precisar do filtro 'all'
+      const url = '/api/employees?active=all'; // Busca TODOS
       const response = await this.fetchWithAuth(url);
       if (!response) return;
-
       const result = await response.json();
       if (!response.ok || !result.success) {
         // Se a resposta paginada foi mantida no backend por engano, pode dar erro aqui
         if (result.data && result.data.pagination) {
           throw new Error("API ainda está retornando dados paginados inesperadamente.");
         }
-        throw new Error(result.message || `Erro ${response.status}`);
+        throw new Error(result.message || `Erro ${response.status}`); 
       }
 
       // Assume que result.data é a lista direta de funcionários agora
