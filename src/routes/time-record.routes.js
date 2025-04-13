@@ -31,6 +31,16 @@ router.get('/employee/:employeeId', timeRecordController.getHistory);
 router.get('/employee/:employeeId/balance-history', timeRecordController.getBalanceHistory);
 
 // Rotas Administrativas (Já tinham authorize, mas precisam de authenticate antes)
-router.delete('/:recordId(\\d+)', authorize(['admin']), timeRecordController.deleteRecord );
+router.delete('/:recordId(\\d+)', authorize(['admin']), timeRecordController.deleteRecord);;
+router.post('/manual', authorize(['admin']), timeRecordController.createManualRecord);
+
+// Editar um registro de ponto existente
+router.put(
+    '/:recordId(\\d+)', // Usa o ID do registro na URL
+    authorize(['admin']), // Somente admin
+    // TODO: Adicionar middleware de validação específico para os dados de edição?
+    timeRecordController.updateRecord // Novo método no controller
+);
+
 
 module.exports = router;

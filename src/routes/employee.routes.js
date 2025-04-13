@@ -69,6 +69,23 @@ router.patch(
     employeeController.updateStatus // Controller lida com a lógica
 );
 
+
+// ---- NOVA ROTA ----
+// Zerar o saldo de horas de um funcionário específico.
+router.patch(
+    '/:id/zero-balance', // Rota específica para zerar saldo
+    authenticate,
+    authorize(['admin']),
+    employeeController.zeroBalance // Novo método no controller
+);
+
+// Ajustar (somar/subtrair) o saldo de horas de um funcionário específico.
+router.patch(
+    '/:id/adjust-balance', // Rota específica para ajustar saldo
+    authenticate,
+    authorize(['admin']),
+    employeeController.adjustBalance // Novo método no controller
+);
 // TODO: Adicionar rotas para reset de senha/PIN (se necessário), upload de foto, etc.
 
 module.exports = router; // Exporta o router configurado
