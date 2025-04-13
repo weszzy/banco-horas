@@ -1,19 +1,325 @@
-/* src/views/style.css */
-/* Estilos gerais */
 :root {
-    --primary-color: #0d6efd;
-    --secondary-color: #6c757d;
-    --success-color: #198754;
-    --danger-color: #dc3545;
-    --warning-color: #ffc107;
-    --info-color: #0dcaf0;
+    /* Paleta de Cores Moderna (Exemplo - ajuste conforme seu gosto) */
+    /* Inspirado em paletas 'cool & calm' */
+    --bg-light: #f8f9fa;
+    /* Fundo principal claro */
+    --bg-dark-theme: #1a1a1a;
+    /* Fundo principal escuro */
+    --text-light: #212529;
+    /* Texto principal no modo claro */
+    --text-dark-theme: #e0e0e0;
+    /* Texto principal no modo escuro */
+    --text-muted-light: #6c757d;
+    --text-muted-dark-theme: #adb5bd;
+
+    --card-bg-light: #ffffff;
+    /* Fundo dos cards claros */
+    --card-bg-dark-theme: #2c2c2c;
+    /* Fundo dos cards escuros */
+    --card-border-light: rgba(0, 0, 0, 0.1);
+    --card-border-dark-theme: rgba(255, 255, 255, 0.15);
+
+    --primary: #007bff;
+    /* Azul Bootstrap padrão (pode mudar) */
+    --primary-hover: #0056b3;
+    --secondary: #6c757d;
+    --success: #198754;
+    /* Verde */
+    --danger: #dc3545;
+    /* Vermelho */
+    --warning: #ffc107;
+    /* Amarelo */
+    --info: #0dcaf0;
+    /* Azul claro */
+
+    --navbar-bg-light: #343a40;
+    /* Navbar escura padrão */
+    --navbar-bg-dark-theme: #111111;
+    /* Navbar ainda mais escura */
+    --navbar-text-light: rgba(255, 255, 255, 0.75);
+    --navbar-text-dark-theme: rgba(255, 255, 255, 0.8);
+    --navbar-text-hover-light: #ffffff;
+    --navbar-text-hover-dark-theme: #ffffff;
+
+    --link-color: var(--primary);
+    --link-hover-color: var(--primary-hover);
+
+    /* Fontes (Exemplo usando 'Poppins' do Google Fonts) */
+    --font-sans-serif: 'Poppins', system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", "Noto Sans", "Liberation Sans", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+    --font-monospace: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+
+    /* Bordas e Sombras */
+    --border-radius-sm: 0.2rem;
+    --border-radius-md: 0.375rem;
+    /* Padrão Bootstrap */
+    --border-radius-lg: 0.5rem;
+    --box-shadow-sm: 0 .125rem .25rem rgba(0, 0, 0, .075);
+    --box-shadow-md: 0 .5rem 1rem rgba(0, 0, 0, .15);
+    /* Sombra sutil para modais */
+    --modal-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.2);
 }
 
+/* ===== ESTILOS GERAIS ===== */
 body {
-    background-color: #f8f9fa;
+    font-family: var(--font-sans-serif);
+    background-color: var(--bg-light);
+    /* Usa variável */
+    color: var(--text-light);
+    /* Usa variável */
     padding-top: 56px;
-    /* Espaço para a navbar fixa */
+    transition: background-color 0.3s ease, color 0.3s ease;
+    /* Transição suave para dark mode */
 }
+
+
+/* Links */
+a {
+    color: var(--link-color);
+    text-decoration: none;
+    /* Remove sublinhado padrão */
+    transition: color 0.2s ease;
+}
+
+a:hover {
+    color: var(--link-hover-color);
+    text-decoration: underline;
+    /* Adiciona sublinhado no hover */
+}
+
+
+/* Botões */
+.btn {
+    border-radius: var(--border-radius-md);
+    transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.btn-primary {
+    background-color: var(--primary);
+    border-color: var(--primary);
+}
+
+.btn-primary:hover {
+    background-color: var(--primary-hover);
+    border-color: var(--primary-hover);
+}
+
+.btn-secondary {
+    background-color: var(--secondary);
+    border-color: var(--secondary);
+}
+
+.btn-success {
+    background-color: var(--success);
+    border-color: var(--success);
+}
+
+.btn-danger {
+    background-color: var(--danger);
+    border-color: var(--danger);
+}
+
+.btn-warning {
+    background-color: var(--warning);
+    border-color: var(--warning);
+}
+
+.btn-info {
+    background-color: var(--info);
+    border-color: var(--info);
+}
+
+/* Adicionar :focus styles para acessibilidade */
+.btn:focus {
+    box-shadow: 0 0 0 0.25rem rgba(var(--bs-primary-rgb), .5);
+}
+
+/* Ajustar cor do focus */
+
+
+
+
+/* Cards */
+.card {
+    background-color: var(--card-bg-light);
+    /* Usa variável */
+    border: 1px solid var(--card-border-light);
+    /* Usa variável */
+    border-radius: var(--border-radius-lg);
+    /* Mais arredondado */
+    box-shadow: var(--box-shadow-sm);
+    /* Sombra sutil padrão */
+    transition: background-color 0.3s ease, border-color 0.3s ease;
+    /* Transição */
+    margin-bottom: 1rem;
+    /* Espaçamento padrão */
+}
+
+.card-header {
+    background-color: transparent;
+    /* Fundo do header transparente */
+    border-bottom: 1px solid var(--card-border-light);
+    /* Usa variável */
+}
+
+
+
+/* Modais */
+.modal-content {
+    border-radius: var(--border-radius-lg);
+    /* Cantos arredondados */
+    border: none;
+    /* Remove borda padrão */
+    box-shadow: var(--modal-shadow);
+    /* Aplica sombra definida */
+    background-color: var(--card-bg-light);
+    /* Fundo do modal */
+    color: var(--text-light);
+    /* Texto do modal */
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.modal-header {
+    border-bottom: 1px solid var(--card-border-light);
+}
+
+.modal-footer {
+    border-top: 1px solid var(--card-border-light);
+}
+
+
+
+
+/* Navbar */
+.navbar {
+    background-color: var(--navbar-bg-light) !important;
+    /* Usa variável */
+    box-shadow: var(--box-shadow-sm);
+    transition: background-color 0.3s ease;
+}
+
+.navbar .navbar-brand, .navbar .nav-link, .navbar .navbar-text {
+    color: var(--navbar-text-light);
+    /* Usa variável */
+}
+
+.navbar .nav-link:hover, .navbar .nav-link.active {
+    color: var(--navbar-text-hover-light);
+    /* Usa variável */
+}
+
+.navbar-toggler {
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+.navbar-toggler-icon {
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba(255, 255, 255, 0.75)' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e");
+}
+
+
+
+/* Offcanvas */
+.offcanvas {
+    background-color: var(--navbar-bg-light);
+    /* Fundo igual navbar */
+    color: var(--navbar-text-light);
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.offcanvas .offcanvas-header {
+    border-bottom-color: rgba(255, 255, 255, 0.2);
+}
+
+.offcanvas .nav-link {
+    color: var(--navbar-text-light);
+}
+
+.offcanvas .nav-link:hover, .offcanvas .nav-link.active {
+    color: var(--navbar-text-hover-light);
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.offcanvas .btn-close-white {
+    filter: invert(1) grayscale(100%) brightness(200%);
+    /* Melhora visibilidade */
+}
+
+
+
+
+/* Inputs e Formulários */
+.form-control, .form-select {
+    border-radius: var(--border-radius-md);
+    border-color: var(--card-border-light);
+    /* Borda mais sutil */
+    background-color: var(--bg-light);
+    /* Ajustar fundo se necessário */
+    color: var(--text-light);
+    transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 0.25rem rgba(var(--bs-primary-rgb), .25);
+    /* Usar a cor primária no foco */
+    background-color: var(--card-bg-light);
+    /* Manter fundo ao focar */
+    color: var(--text-light);
+}
+
+
+
+/* Placeholder */
+.form-control::placeholder {
+    color: var(--text-muted-light);
+    opacity: 0.7;
+}
+
+
+
+
+/* Tabela Admin */
+#adminArea .table {
+    border-color: var(--card-border-light);
+    /* Borda da tabela */
+}
+
+#adminArea .table th {
+    color: var(--text-light);
+    /* Cor do cabeçalho */
+}
+
+#adminArea .table td {
+    color: var(--text-light);
+    /* Cor do texto das células */
+}
+
+#adminArea .table-hover>tbody>tr:hover>* {
+    background-color: rgba(0, 0, 0, 0.05);
+    /* Fundo sutil no hover da linha */
+    color: var(--text-light);
+}
+
+#adminArea .badge {
+    border-radius: var(--border-radius-sm);
+}
+
+
+/* Saldo Específico (Mantido) */
+.balance-positive {
+    color: var(--success);
+}
+
+.balance-negative {
+    color: var(--danger);
+}
+
+.balance-zero {
+    color: var(--text-muted-light);
+}
+
+/* Usa muted */
+
+
 
 .main-container {
     padding-top: 0.75rem;
@@ -163,32 +469,8 @@ body {
     /* Deixa o valor mais destacado */
 }
 
-/* Tabela Admin */
-#adminArea .table {
-    font-size: 0.9rem;
-}
 
-#adminArea .table th, #adminArea .table td {
-    vertical-align: middle;
-    padding: 0.5rem;
-}
 
-#adminArea .table th:last-child, #adminArea .table td:last-child {
-    text-align: right;
-    white-space: nowrap;
-    padding-right: 0.75rem;
-}
-
-#adminArea .btn-group-sm>.btn {
-    margin-left: 0.25rem;
-    padding: 0.15rem 0.4rem;
-    font-size: 0.8rem;
-}
-
-/* Botões de ação menores */
-#adminArea .btn-group-sm>.btn:first-child {
-    margin-left: 0;
-}
 
 @media (max-width: 576px) {
 
@@ -293,3 +575,157 @@ body {
         font-size: 1rem;
     }
 }
+
+/* ===== DARK MODE ESTILOS ===== */
+body.dark-mode {
+    --bg-light: var(--bg-dark-theme);
+    /* Inverte fundo claro/escuro */
+    --text-light: var(--text-dark-theme);
+    /* Inverte texto claro/escuro */
+    --text-muted-light: var(--text-muted-dark-theme);
+    --card-bg-light: var(--card-bg-dark-theme);
+    --card-border-light: var(--card-border-dark-theme);
+    --navbar-bg-light: var(--navbar-bg-dark-theme);
+    --navbar-text-light: var(--navbar-text-dark-theme);
+    --navbar-text-hover-light: var(--navbar-text-hover-dark-theme);
+    --link-color: #69a6f8;
+    /* Azul mais claro para links */
+    --link-hover-color: #8cbcfd;
+}
+
+/* Ajustes específicos para dark mode */
+body.dark-mode .navbar-toggler-icon {
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba(255, 255, 255, 0.8)' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e");
+}
+
+body.dark-mode .offcanvas {
+    background-color: var(--navbar-bg-dark-theme);
+    color: var(--navbar-text-dark-theme);
+}
+
+body.dark-mode .offcanvas .offcanvas-header {
+    border-bottom-color: rgba(255, 255, 255, 0.2);
+}
+
+body.dark-mode .offcanvas .nav-link {
+    color: var(--navbar-text-dark-theme);
+}
+
+body.dark-mode .offcanvas .nav-link:hover,
+body.dark-mode .offcanvas .nav-link.active {
+    color: #fff;
+    background-color: rgba(255, 255, 255, 0.15);
+}
+
+body.dark-mode .form-control,
+body.dark-mode .form-select {
+    background-color: #333;
+    /* Fundo mais escuro para inputs */
+    color: var(--text-dark-theme);
+    border-color: var(--card-border-dark-theme);
+}
+
+body.dark-mode .form-control:focus,
+body.dark-mode .form-select:focus {
+    background-color: #444;
+    color: var(--text-dark-theme);
+    border-color: var(--primary);
+    /* Mantém borda primária no foco */
+    box-shadow: 0 0 0 0.25rem rgba(var(--bs-primary-rgb), .35);
+}
+
+body.dark-mode .form-control::placeholder {
+    color: var(--text-muted-dark-theme);
+    opacity: 0.7;
+}
+
+body.dark-mode .modal-content {
+    background-color: var(--card-bg-dark-theme);
+    color: var(--text-dark-theme);
+}
+
+body.dark-mode .modal-header {
+    border-bottom-color: var(--card-border-dark-theme);
+}
+
+body.dark-mode .modal-footer {
+    border-top-color: var(--card-border-dark-theme);
+}
+
+body.dark-mode .btn-close {
+    filter: invert(1) grayscale(100%) brightness(200%);
+}
+
+
+body.dark-mode .list-group-item {
+    background-color: transparent;
+    /* Fundo do item da lista */
+    border-color: var(--card-border-dark-theme);
+    /* Borda do item */
+    color: var(--text-dark-theme);
+    /* Cor do texto */
+}
+
+body.dark-mode .list-group-item.bg-light {
+    /* Ajusta o item destacado */
+    background-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+body.dark-mode .table {
+    color: var(--text-dark-theme);
+    border-color: var(--card-border-dark-theme);
+}
+
+body.dark-mode .table th, body.dark-mode .table td {
+    border-color: var(--card-border-dark-theme);
+    /* Borda interna da tabela */
+}
+
+body.dark-mode .table-striped>tbody>tr:nth-of-type(odd)>* {
+    --bs-table-accent-bg: rgba(255, 255, 255, 0.04);
+    /* Cor da linha zebrada */
+    color: var(--text-dark-theme);
+}
+
+body.dark-mode .table-hover>tbody>tr:hover>* {
+    background-color: rgba(255, 255, 255, 0.08);
+    /* Fundo hover linha */
+    color: var(--text-dark-theme);
+}
+
+/* Ajuste Select2 Dark Mode (pode precisar de mais refinamento) */
+body.dark-mode .select2-container--default .select2-selection--single {
+    background-color: #333;
+    border-color: var(--card-border-dark-theme);
+    color: var(--text-dark-theme);
+}
+
+body.dark-mode .select2-container--default .select2-selection--single .select2-selection__rendered {
+    color: var(--text-dark-theme);
+}
+
+body.dark-mode .select2-container--default .select2-selection--single .select2-selection__arrow b {
+    border-color: #bbb transparent transparent transparent;
+}
+
+body.dark-mode .select2-dropdown {
+    background-color: var(--card-bg-dark-theme);
+    border-color: var(--card-border-dark-theme);
+}
+
+body.dark-mode .select2-container--default .select2-results__option--highlighted[aria-selected] {
+    background-color: var(--primary);
+    color: #fff;
+}
+
+body.dark-mode .select2-results__option[aria-selected=true] {
+    background-color: #555;
+}
+
+body.dark-mode .select2-search--dropdown .select2-search__field {
+    background-color: #444;
+    color: var(--text-dark-theme);
+    border-color: var(--card-border-dark-theme);
+}
+
+/* ===== FIM DARK MODE ===== */
