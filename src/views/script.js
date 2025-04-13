@@ -425,8 +425,14 @@ class PontoApp {
         throw new Error(result.message || `Erro ${response.status}`);
       }
 
+      // --- SUCESSO ---
       this.showAlert('success', `Saldo ajustado com sucesso!`);
-      modalInstance.hide(); // Fecha o modal de ajuste
+
+      // 1. FECHA O MODAL DE AJUSTE PRIMEIRO!
+      console.log("[AdjustBalance] Fechando o modal de ajuste...");
+      modalInstance.hide();
+      // O listener 'hidden.bs.modal' adicionado em _ensureModalInstance
+      // cuidará de chamar o reset do formulário automaticamente após o fechamento.
 
       // --- Atualiza a UI (similar ao zeroBalance e deleteRecord) ---
       const isProfileModalOpen = this.ui.profileModalElement?.classList.contains('show');
@@ -458,7 +464,7 @@ class PontoApp {
 
 
 
-  
+
   /**
        * Manipula o clique no botão "Zerar Saldo" dentro do modal de perfil.
        * Pede confirmação e chama a API para zerar o saldo do funcionário visualizado.
