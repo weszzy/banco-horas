@@ -3,6 +3,7 @@ const { Employee } = require('../models/employee.model'); // Caminho para o mode
 const { sendResponse } = require('../utils/response.util'); // Helper de resposta
 const logger = require('../utils/logger.util'); // Logger
 const { Op } = require('sequelize'); // Operadores Sequelize (se necessário para queries complexas)
+const BalanceService = require('../services/balance.service');
 
 class EmployeeController {
 
@@ -254,7 +255,112 @@ class EmployeeController {
         }
     }
 
+    /**
+         * @route PATCH /api/employees/:id/zero-balance
+         * @description (Admin) Zera o saldo de horas acumulado de um funcionário.
+         * @param {object} req - Objeto da requisição Express (req.params.id).
+         * @param {object} res - Objeto da resposta Express.
+         */
+    async zeroBalance(req, res) {
+        const employeeIdToUpdate = req.params.id;
+        const adminUserId = req.user.id; // Para log
+
+        logger.info(`[Admin Action] Tentativa de ZERAR saldo para Employee ID ${employeeIdToUpdate} por Admin ID ${adminUserId}.`);
+
+        // Não permitir zerar o próprio saldo (opcional, mas talvez uma boa prática)
+        if (employeeIdToUpdate === adminUserId.toString()) {
+            logger.warn(`[Admin Action] Admin ${adminUserId} tentou zerar o próprio saldo.`);
+            return sendResponse(res, 400, 'Não é permitido zerar o próprio saldo diretamente.');
+        }
+
+        try {
+            // Busca o funcionário
+            const employee = await Employee.findByPk(employeeIdToUpdate);
+            if (!employee) {
+                return sendResponse(res, 404, 'Funcionário não encontrado.');
+            }
+
+            // Define o saldo como 0.00
+            employee.hourBalance = 0.00;
+
+            // Salva a alteração (apenas hourBalance e updatedAt)
+            await employee.save({ fields: ['hourBalance', 'updatedAt'] });
+
+            logger.info(`[Admin Action] Saldo ZERADO com sucesso para Employee ID ${employeeIdToUpdate} por Admin ID ${adminUserId}.`);
+            sendResponse(res, 200, 'Saldo de horas zerado com sucesso.', { id: employee.id, hourBalance: employee.hourBalance });
+
+        } catch (error) {
+            logger.error(`[Admin Action] Erro ao zerar saldo do funcionário (ID: ${employeeIdToUpdate}):`, error);
+            sendResponse(res, 500, 'Erro interno ao zerar saldo do funcionário.');
+        }
+    }
+    
+
+    /**
+         * @route PATCH /api/employees/:id/adjust-balance
+         * @description (Admin) Ajusta manualmente o saldo de horas acumulado (adiciona ou subtrai).
+         * @param {object} req - Objeto da requisição Express (req.params.id, req.body com { adjustment: number, reason?: string }).
+         * @param {object} res - Objeto da resposta Express.
+         */
+    async adjustBalance(req, res) {
+        const employeeIdToUpdate = req.params.id;
+        const adminUserId = req.user.id;
+        const { adjustment, reason } = req.body; // adjustment: valor a somar (pode ser negativo)
+
+        logger.info(`[Admin Action] Tentativa de AJUSTAR saldo para Employee ID ${employeeIdToUpdate} por ${adjustment}h por Admin ID ${adminUserId}. Razão: ${reason || 'Não informada'}`);
+
+        // --- Validação do Input ---
+        const adjustmentValue = parseFloat(adjustment);
+        if (isNaN(adjustmentValue)) {
+            return sendResponse(res, 400, 'Valor de ajuste inválido. Deve ser um número.');
+        }
+        if (adjustmentValue === 0) {
+            return sendResponse(res, 400, 'Valor de ajuste não pode ser zero.');
+        }
+
+        // Não permitir ajustar o próprio saldo (opcional)
+        if (employeeIdToUpdate === adminUserId.toString()) {
+            logger.warn(`[Admin Action] Admin ${adminUserId} tentou ajustar o próprio saldo.`);
+            return sendResponse(res, 400, 'Não é permitido ajustar o próprio saldo diretamente.');
+        }
+
+        try {
+            // Chama o BalanceService para fazer a atualização atômica
+            // O BalanceService já verifica se o funcionário existe e está ativo.
+            const success = await BalanceService.updateAccumulatedBalance(
+                parseInt(employeeIdToUpdate, 10), // Garante que é número
+                adjustmentValue // Passa o valor do ajuste diretamente
+                // Não precisamos de transação aqui, pois updateAccumulatedBalance é atômico
+            );
+
+            if (!success) {
+                // O BalanceService já logou o erro específico (ex: funcionário não encontrado/inativo, erro DB)
+                // Retornamos um erro genérico ou uma mensagem indicando que não foi possível.
+                return sendResponse(res, 400, 'Não foi possível ajustar o saldo. Verifique se o funcionário existe e está ativo.');
+            }
+
+            // Busca o funcionário novamente para retornar o saldo atualizado
+            const updatedEmployee = await Employee.findByPk(employeeIdToUpdate, { attributes: ['id', 'hourBalance'] });
+
+            // TODO: Registrar a auditoria do ajuste (quem fez, quando, valor, motivo) em uma tabela separada?
+
+            logger.info(`[Admin Action] Saldo AJUSTADO com sucesso para Employee ID ${employeeIdToUpdate} por Admin ID ${adminUserId}. Novo saldo: ${updatedEmployee?.hourBalance}`);
+            sendResponse(res, 200, 'Saldo de horas ajustado com sucesso.', { id: updatedEmployee?.id, hourBalance: updatedEmployee?.hourBalance });
+
+        } catch (error) {
+            // Captura erros inesperados não tratados pelo BalanceService
+            logger.error(`[Admin Action] Erro inesperado ao ajustar saldo do funcionário (ID: ${employeeIdToUpdate}):`, error);
+            sendResponse(res, 500, 'Erro interno ao ajustar saldo do funcionário.');
+        }
+    }
 }
+
+
+
+
+
+
+
 
 // Exporta uma instância única do controller
 module.exports = new EmployeeController();

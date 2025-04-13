@@ -489,7 +489,138 @@ class TimeRecordController {
     }
   }
 
+
+
+  /**
+     * @route PUT /api/time-records/:recordId
+     * @description (Admin) Edita um registro de ponto existente.
+     * Recalcula o impacto no saldo do dia e ajusta o saldo acumulado do funcionário.
+     * Requer todos os campos de tempo (startTime, endTime, lunchStartTime?, lunchEndTime?) no body.
+     * Utiliza transação para garantir atomicidade.
+     */
+  async updateRecord(req, res) {
+    const { recordId } = req.params;
+    const adminUserId = req.user.id;
+    // Extrair novos tempos do corpo da requisição
+    // Formato esperado: String 'YYYY-MM-DDTHH:MM:SS' ou similar que `new Date()` entenda.
+    // Ou separar data e hora: { date: 'YYYY-MM-DD', startTime: 'HH:MM', ... }
+    const { startTime, endTime, lunchStartTime, lunchEndTime /*, reason? */ } = req.body;
+
+    logger.info(`[Admin Action] Tentativa de EDITAR registro ID ${recordId} por Admin ID ${adminUserId}.`);
+
+    // --- Validação de Input (essencial) ---
+    if (!startTime || !endTime) {
+      return sendResponse(res, 400, 'Hora de início e fim são obrigatórias para editar.');
+    }
+    // Adicionar validação de formato/data aqui usando try/catch com `new Date()`
+    // e validação de consistência (fim > inicio, etc.) como em `createManualRecord`.
+    let startDateTime, endDateTime, lunchStartDateTime = null, lunchEndDateTime = null;
+    try {
+      // Exemplo (precisa adaptar se o formato de entrada for diferente):
+      startDateTime = new Date(startTime);
+      endDateTime = new Date(endTime);
+      if (lunchStartTime) lunchStartDateTime = new Date(lunchStartTime);
+      if (lunchEndTime) lunchEndDateTime = new Date(lunchEndTime);
+
+      if (isNaN(startDateTime.getTime()) || isNaN(endDateTime.getTime()) ||
+        (lunchStartDateTime && isNaN(lunchStartDateTime.getTime())) ||
+        (lunchEndDateTime && isNaN(lunchEndDateTime.getTime()))) {
+        throw new Error('Formato de data/hora inválido.');
+      }
+      // Adicionar validações de consistência (fim > inicio, etc.)
+      if (endDateTime <= startDateTime) throw new Error('Hora de fim deve ser posterior à hora de início.');
+      // ... outras validações ...
+
+    } catch (validationError) {
+      logger.warn(`[Admin Action Edit] Erro validação data/hora: ${validationError.message}`, req.body);
+      return sendResponse(res, 400, `Erro na data/hora: ${validationError.message}`);
+    }
+    // --- Fim Validação ---
+
+
+    const transaction = await sequelize.transaction();
+    try {
+      // 1. Buscar o registro e o funcionário associado DENTRO da transação.
+      const record = await TimeRecord.findByPk(recordId, { transaction });
+      if (!record) {
+        await transaction.rollback();
+        return sendResponse(res, 404, 'Registro de ponto não encontrado.');
+      }
+      const employee = await Employee.findByPk(record.employeeId, { attributes: ['id', 'weeklyHours', 'isActive'], transaction });
+      if (!employee) {
+        // Improvável se o registro existe, mas seguro verificar.
+        await transaction.rollback();
+        return sendResponse(res, 404, 'Funcionário associado ao registro não encontrado.');
+      }
+      if (!employee.isActive) {
+        logger.warn(`[Admin Action Edit] Tentativa de editar registro ${recordId} de funcionário inativo (${employee.id}). Permitindo, mas atenção.`);
+        // Decidir se permite editar registros de inativos. Se não, retornar erro aqui.
+      }
+
+
+      // 2. Calcular o saldo diário ANTES da modificação.
+      //    Importante: Usar os dados DO REGISTRO ATUAL no banco.
+      const oldDailyBalance = BalanceService.calculateDailyBalance(record, employee) ?? 0;
+      logger.info(`[Admin Action Edit] Saldo diário ANTES da edição (Record ID ${recordId}): ${oldDailyBalance}h`);
+
+
+      // 3. Atualizar os dados do registro com os novos valores.
+      record.startTime = startDateTime;
+      record.endTime = endDateTime;
+      record.lunchStartTime = lunchStartDateTime; // Será null se não fornecido
+      record.lunchEndTime = lunchEndDateTime;   // Será null se não fornecido
+      // O campo `totalHours` será recalculado automaticamente pelo hook `beforeSave`.
+
+      // 4. Salvar o registro modificado DENTRO da transação.
+      await record.save({ transaction });
+      logger.info(`[Admin Action Edit] Registro ID ${recordId} salvo com novos tempos. Novas horas totais: ${record.totalHours}`);
+
+
+      // 5. Calcular o saldo diário DEPOIS da modificação.
+      //    Usa o mesmo método, mas agora com os dados atualizados do `record`.
+      const newDailyBalance = BalanceService.calculateDailyBalance(record, employee) ?? 0;
+      logger.info(`[Admin Action Edit] Saldo diário DEPOIS da edição (Record ID ${recordId}): ${newDailyBalance}h`);
+
+
+      // 6. Calcular o delta (diferença) a ser aplicado ao saldo acumulado.
+      const balanceDelta = parseFloat((newDailyBalance - oldDailyBalance).toFixed(2));
+      logger.info(`[Admin Action Edit] Delta de saldo a ser aplicado ao acumulado (Employee ${employee.id}): ${balanceDelta}h`);
+
+
+      // 7. Se houver diferença, ajustar o saldo acumulado DENTRO da transação.
+      if (balanceDelta !== 0) {
+        const balanceUpdated = await BalanceService.updateAccumulatedBalance(employee.id, balanceDelta, transaction);
+        if (!balanceUpdated) {
+          logger.error(`[Admin Action Edit] Falha ao AJUSTAR saldo acumulado após edição do registro ${recordId}. Operação será revertida.`);
+          throw new Error('Falha ao atualizar saldo acumulado após editar registro.');
+        }
+        logger.info(`[Admin Action Edit] Saldo acumulado ajustado para Employee ${employee.id} após edição do registro ${recordId}.`);
+      } else {
+        logger.info(`[Admin Action Edit] Edição do registro ${recordId} não resultou em mudança no saldo diário. Saldo acumulado não alterado.`);
+      }
+
+
+      // 8. Se tudo deu certo, commitar a transação.
+      await transaction.commit();
+      logger.info(`[Admin Action Edit] Transação de edição do registro ${recordId} commitada.`);
+      // Retorna o registro atualizado
+      sendResponse(res, 200, 'Registro de ponto atualizado com sucesso.', record);
+
+    } catch (error) {
+      logger.error(`[Admin Action Edit] Erro ao editar registro ID ${recordId}. Revertendo transação. Erro:`, error);
+      if (transaction && !transaction.finished) {
+        await transaction.rollback();
+        logger.info(`[Admin Action Edit] Transação de edição do registro ${recordId} revertida.`);
+      }
+      if (error.name === 'SequelizeValidationError') {
+        return sendResponse(res, 400, `Erro de validação: ${error.errors.map(e => e.message).join('; ')}`);
+      }
+      sendResponse(res, 500, 'Erro interno ao editar registro de ponto.');
+    }
+  }
 }
+
+
 
 // Exporta a instância do controller
 module.exports = new TimeRecordController();
