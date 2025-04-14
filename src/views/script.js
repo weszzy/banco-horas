@@ -843,7 +843,82 @@ class PontoApp {
 
   // --- Lógica de Autenticação ---
   /** Manipula o envio do formulário de login. */
-  async handleLogin() { console.log("Handling login logic..."); const loginModal = this.ui.loginModal; if (!loginModal) { console.error("Login Modal not initialized."); return; } const loginForm = this.ui.loginModalElement?.querySelector('#loginForm'); const btnSubmit = this.ui.loginModalElement?.querySelector('#btnLoginSubmit'); const loginError = this.ui.loginModalElement?.querySelector('#loginError'); if (!loginForm || !btnSubmit || !loginError) { console.error("Elementos internos login modal não encontrados."); return; } const email = loginForm.email.value; const password = loginForm.password.value; loginError.style.display = 'none'; if (!email || !password) { loginError.textContent = 'E-mail/senha obrigatórios.'; loginError.style.display = 'block'; return; } btnSubmit.disabled = true; btnSubmit.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Entrando...'; try { const response = await fetch('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) }); if (!response) throw new Error("Falha na requisição."); const result = await response.json(); if (!response.ok || !result.success) throw new Error(result.message || `Erro ${response.status}`); this.state.token = result.data.token; this.state.currentUser = result.data.user; localStorage.setItem('authToken', this.state.token); localStorage.setItem('currentUser', JSON.stringify(this.state.currentUser)); console.log("Login successful."); loginModal.hide(); this._updateView(); } catch (error) { console.error("Login failed:", error); loginError.textContent = `Falha: ${error.message}`; loginError.style.display = 'block'; } finally { btnSubmit.disabled = false; btnSubmit.innerHTML = 'Entrar'; } }
+  async handleLogin() {
+    console.log("Handling login logic..."); const loginModal = this.ui.loginModal;
+    if (!loginModal) { console.error("Login Modal not initialized."); return; } const loginForm = this.ui.loginModalElement?.querySelector('#loginForm');
+    const btnSubmit = this.ui.loginModalElement?.querySelector('#btnLoginSubmit'); const loginError = this.ui.loginModalElement?.querySelector('#loginError');
+    if (!loginForm || !btnSubmit || !loginError) { console.error("Elementos internos login modal não encontrados."); return; }
+    const email = loginForm.email.value; const password = loginForm.password.value; loginError.style.display = 'none';
+    if (!email || !password) {
+      loginError.textContent = 'E-mail/senha obrigatórios.'; loginError.style.display = 'block';
+      return;
+    } btnSubmit.disabled = true; btnSubmit.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Entrando...';
+
+
+    // --- INÍCIO: Lógica de Indicador de Loading/Aquecimento ---
+    btnSubmit.disabled = true;
+    // Mudar o texto para indicar que está conectando/aquecendo
+    btnSubmit.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span> Conectando...';
+    // this.showAlert('info', 'Conectando ao servidor... Isso pode levar alguns segundos.', 15000); // Mostra por 15s ou até ser fechado
+    // Opcional: Adicionar um timeout MÁXIMO para a requisição de login
+    const loginTimeoutMillis = 30000; // Ex: 30 segundos
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      console.warn(`[Login] Timeout de ${loginTimeoutMillis / 1000}s atingido.`);
+      controller.abort(); // Cancela a requisição fetch
+    }, loginTimeoutMillis);
+    // --- FIM: Lógica de Indicador de Loading/Aquecimento ---
+
+
+
+    try {
+      const response = await this.fetchWithAuth('/api/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ email, password }),
+        signal: controller.signal // Passa o AbortSignal para o fetch
+      });
+
+      clearTimeout(timeoutId); // Cancela o timeout se a resposta chegou a tempo
+
+      if (!response) {
+        // fetchWithAuth já tratou 401/erro de rede e rejeitou a promessa
+        // Mas podemos colocar um erro genérico aqui se necessário, embora não deva ser alcançado.
+        throw new Error("Falha na comunicação com o servidor.");
+      }
+
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || `Erro ${response.status}`);
+      }
+
+      // --- Sucesso ---
+      this.state.token = result.data.token;
+      this.state.currentUser = result.data.user;
+      localStorage.setItem('authToken', this.state.token);
+      localStorage.setItem('currentUser', JSON.stringify(this.state.currentUser));
+      console.log("Login successful.");
+      loginModalInstance.hide(); // Usa a instância garantida
+      this._updateView();
+
+    } catch (error) {
+      clearTimeout(timeoutId); // Limpa timeout em caso de erro também
+      console.error("Login failed:", error);
+      let errorMessage = `Falha no login: ${error.message}`;
+      if (error.name === 'AbortError') {
+        errorMessage = "Falha no login: O servidor demorou muito para responder. Tente novamente.";
+        // Poderia adicionar um link para verificar status do serviço?
+      } else if (error.message === 'Não autorizado') {
+        errorMessage = "Sessão inválida ou expirada. Faça login novamente."; // Mensagem específica do fetchWithAuth
+      }
+      loginError.textContent = errorMessage;
+      loginError.style.display = 'block';
+
+    } finally {
+      // Garante que o botão seja reabilitado independentemente do resultado
+      btnSubmit.disabled = false;
+      btnSubmit.innerHTML = 'Entrar';
+    }
+  }
 
 
 
