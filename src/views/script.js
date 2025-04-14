@@ -4,6 +4,13 @@
  * Organizado em uma classe PontoApp para encapsular estado e lógica.
  */
 
+// --- DEFINIR URL BASE DA API ---
+// Substitua pela URL real do seu backend no Render
+
+const API_BASE_URL = process.env.REACT_APP_API_URL
+console.log(`[Config] API Base URL: ${API_BASE_URL}`);
+
+
 class PontoApp {
   constructor() {
     console.log("[PontoApp] Constructor - Inicializando...");
@@ -1381,35 +1388,50 @@ class PontoApp {
    */
 
 
-  async fetchWithAuth(url, options = {}) {
-    console.log(`fetchWithAuth: ${options.method || 'GET'} ${url}`);
-    const headers = { 'Content-Type': 'application/json', ...options.headers };
-    // Lê o token DIRETAMENTE do localStorage a cada chamada
-    const token = localStorage.getItem('authToken');
+  /**
+      * Wrapper para a API `fetch` que:
+      * 1. Precede URLs relativas (começando com '/') com a API_BASE_URL.
+      * 2. Adiciona automaticamente o header 'Content-Type: application/json' (se não for FormData).
+      * 3. Adiciona o header 'Authorization: Bearer <token>' se um token existir no localStorage.
+      * 4. Detecta respostas 401 (Não Autorizado), dispara logout e rejeita a promessa.
+      * 5. Retorna a resposta para tratamento posterior ou rejeita em caso de erro de rede.
+      *
+      * @param {string} relativeUrl - A URL da API RELATIVA ao base (ex: '/api/auth/login', '/api/employees/me').
+      * @param {object} options - Opções do Fetch (method, body, etc.).
+      * @returns {Promise<Response>} A resposta do fetch ou uma promessa rejeitada.
+      */
+  async fetchWithAuth(relativeUrl, options = {}) {
+    // Constrói a URL completa
+    const fullUrl = relativeUrl.startsWith('http') ? relativeUrl : `${API_BASE_URL}${relativeUrl}`;
+    console.log(`fetchWithAuth: ${options.method || 'GET'} ${fullUrl}`); // Loga a URL completa
 
+    // Define headers padrão (exceto se o body for FormData)
+    const headers = { ...(options.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }), ...options.headers };
+
+    const token = localStorage.getItem('authToken');
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
-      console.log(`[fetchWithAuth] Token Bearer encontrado e sendo enviado para ${url}`);
+      // Removido log repetitivo daqui
     } else {
-      console.warn(`[fetchWithAuth] Token não encontrado no localStorage para ${url}. A requisição falhará se for protegida.`);
-      // Não rejeita a promessa aqui, deixa a API retornar 401 se necessário.
+      console.warn(`[fetchWithAuth] Token não encontrado no localStorage para ${fullUrl}.`);
     }
 
     try {
-      const response = await fetch(url, { ...options, headers });
-      // Tratamento global para erro 401 (Não Autorizado)
+      const response = await fetch(fullUrl, { ...options, headers }); // Usa fullUrl
+
       if (response.status === 401) {
-        console.error("fetchWithAuth: Erro 401 - Não autorizado detectado. Deslogando...");
+        console.error(`fetchWithAuth: Erro 401 - Não autorizado para ${fullUrl}. Deslogando...`);
         this.showAlert('danger', 'Sessão inválida ou expirada. Faça login novamente.');
-        this.handleLogout(); // Força o logout
-        return Promise.reject(new Error('Não autorizado')); // Rejeita a promessa para interromper
+        this.handleLogout();
+        return Promise.reject(new Error('Não autorizado'));
       }
-      // Retorna a resposta para tratamento posterior (incluindo outros erros como 403, 404, 500)
-      return response;
+
+      return response; // Retorna a resposta completa
+
     } catch (networkError) {
-      console.error(`fetchWithAuth: Erro de rede ou fetch para ${url}:`, networkError);
-      this.showAlert('danger', `Erro de conexão ao tentar acessar a API. Verifique sua rede.`);
-      return Promise.reject(networkError); // Rejeita a promessa
+      console.error(`fetchWithAuth: Erro de rede ou fetch para ${fullUrl}:`, networkError);
+      this.showAlert('danger', `Erro de conexão ao tentar acessar a API (${relativeUrl}). Verifique sua rede.`);
+      return Promise.reject(networkError);
     }
   }
 
