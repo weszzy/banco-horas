@@ -1,38 +1,38 @@
 // src/server.js
-require('dotenv').config({ path: require('path').resolve(__dirname, '../.env') }); // Carrega variáveis de ambiente do .env na raiz
+require('dotenv').config({ path: require('path').resolve(__dirname, '../.env') });
 const express = require('express');
-const helmet = require('helmet'); // Helmet ajuda a proteger o app configurando vários cabeçalhos HTTP
-const rateLimit = require('express-rate-limit'); // Limita a taxa de requisições para prevenir ataques de força bruta/DoS
-const cors = require('cors'); // Habilita Cross-Origin Resource Sharing
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+const cors = require('cors'); // Importa cors
 const path = require('path');
-const logger = require('./utils/logger.util'); // Winston logger
-const errorHandler = require('./middlewares/error.middleware'); // Middleware de tratamento de erro centralizado
-const { sequelize } = require('./config/database'); // Instância do Sequelize para conexão DB
+const logger = require('./utils/logger.util');
+const errorHandler = require('./middlewares/error.middleware');
+const { sequelize } = require('./config/database');
 
 const app = express();
 
+// --- Configurações de Confiança e Proxy ---
+app.set('trust proxy', 1);
+logger.info("Configuração 'trust proxy' definida como 1.");
 
-// Lista de origens permitidas
+// --- Middleware CORS (CONFIGURAÇÃO ÚNICA E CORRETA) ---
 const selfOrigin = process.env.RENDER_EXTERNAL_URL || 'https://banco-horas-app.onrender.com';
 const allowedOriginsFromEnv = process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : [];
 const allowedOrigins = [
+    selfOrigin,
     ...allowedOriginsFromEnv,
-    ' https://banco-horas-app.onrender.com', // Inclui origens do .env (ex: seu frontend web se hospedado separadamente)
-    'http://localhost',        // Origem padrão da WebView Android Capacitor
-    'capacitor://localhost'    // Origem padrão da WebView iOS Capacitor
-    // Adicione aqui esquemas customizados se você definir um no capacitor.config.json
-    // Ex: 'app://com.dwdp.bancohoras'
+    'http://localhost',
+    'capacitor://localhost'
 ];
 
 const corsOptions = {
     origin: function (origin, callback) {
-        // Permite requisições sem origem OU se a origem está na lista de permissões.
         if (!origin || allowedOrigins.indexOf(origin) !== -1) {
             logger.debug(`[CORS] Permitido acesso para origem: ${origin || 'sem origem'}`);
-            callback(null, true); // Permite a requisição
+            callback(null, true);
         } else {
             logger.warn(`[CORS] Bloqueado acesso para origem não permitida: ${origin}`);
-            callback(new Error('Not allowed by CORS')); // Bloqueia a requisição
+            callback(new Error('Not allowed by CORS'));
         }
     },
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
@@ -40,9 +40,7 @@ const corsOptions = {
     credentials: true // Opcional
 };
 
-
-app.use(cors(corsOptions)); // Usa as opções configuradas
-logger.info(`Middleware CORS configurado. Origens permitidas via env: ${process.env.ALLOWED_ORIGINS || 'Nenhuma'}. Origens Capacitor adicionadas: http://localhost, capacitor://localhost`);
+app.use(cors(corsOptions)); // Aplica a configuração AQUI
 logger.info(`Middleware CORS configurado. Origens Permitidas: ${allowedOrigins.join(', ')}`);
 
 // --- FIM Middleware CORS ATUALIZADO --
@@ -79,16 +77,6 @@ app.use(
 );
 logger.info("Middleware Helmet (com CSP customizado) configurado.");
 
-
-// --- Middleware CORS ---
-// Configura quais origens externas podem acessar a API.
-// Usa variável de ambiente `ALLOWED_ORIGINS` (separadas por vírgula) ou '*' para permitir todas (inseguro em produção!).
-app.use(cors({
-    origin: process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : '*',
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'], // Métodos HTTP permitidos
-    allowedHeaders: ['Content-Type', 'Authorization'] // Cabeçalhos permitidos nas requisições
-}));
-logger.info(`Middleware CORS configurado. Origens permitidas: ${process.env.ALLOWED_ORIGINS || '*'}`);
 
 // --- Middlewares Globais de Parsing ---
 // Habilita parsing de JSON no corpo das requisições (limitado a 10kb)
