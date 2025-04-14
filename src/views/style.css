@@ -360,9 +360,7 @@ a:hover {
 /* ===== DARK MODE ESTILOS ===== */
 body.dark-mode {
     --bg-light: var(--bg-dark-theme);
-    /* Inverte fundo claro/escuro */
     --text-light: var(--text-dark-theme);
-    /* Inverte texto claro/escuro */
     --text-muted-light: var(--text-muted-dark-theme);
     --card-bg-light: var(--card-bg-dark-theme);
     --card-border-light: var(--card-border-dark-theme);
@@ -370,154 +368,193 @@ body.dark-mode {
     --navbar-text-light: var(--navbar-text-dark-theme);
     --navbar-text-hover-light: var(--navbar-text-hover-dark-theme);
     --link-color: #69a6f8;
-    /* Azul mais claro para links */
     --link-hover-color: #8cbcfd;
+
+    /* --- NOVOS OVERRIDES DE COR PARA CONTEÚDO --- */
+
+    /* Regra geral para texto dentro de cards */
+    .card, .card .card-body, .card .card-header {
+        color: var(--text-dark-theme);
+        /* Garante texto claro base */
+    }
+
+    /* Sobrescreve utilitário text-muted do Bootstrap */
+    .text-muted {
+        color: var(--text-muted-dark-theme) !important;
+        /* !important pode ser necessário para sobrescrever utilitário */
+    }
+
+    /* Garante cores para títulos e subtítulos de cards */
+    .card-title {
+        color: var(--text-dark-theme);
+    }
+
+    .card-subtitle {
+        color: var(--text-muted-dark-theme);
+    }
+
+    /* Garante cor base para o saldo antes das classes +/-/0 */
+    #summaryBalanceMobile {
+        color: var(--text-dark-theme);
+    }
+
+    /* Ajusta cores específicas de saldo se necessário (opcional) */
+    #summaryBalanceMobile.balance-positive {
+        color: #20c997;
+        /* Ex: Um verde um pouco mais brilhante */
+    }
+
+    #summaryBalanceMobile.balance-negative {
+        color: #fd7e14;
+        /* Ex: Um laranja/vermelho mais visível */
+    }
+
+    /* Garante cor para texto dentro dos itens da lista de status */
+    #statusDetailsMobile .list-group-item,
+    #statusDetailsMobile .list-group-item span,
+    #statusDetailsMobile .list-group-item strong {
+        color: inherit;
+        /* Faz herdar a cor do pai (.list-group-item) */
+    }
 }
 
+    /* Ajustes específicos para dark mode */
+    body.dark-mode .navbar-toggler-icon {
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba(255, 255, 255, 0.8)' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e");
+    }
 
-/* DENTRO de body.dark-mode { ... } */
-body.dark-mode .navbar .navbar-text {
-    color: var(--navbar-text-dark-theme);
-    /* Garante a cor correta */
-}
+    body.dark-mode .balance-zero {
+        color: var(--text-muted-dark-theme);
+    }
 
-/* Ajustes específicos para dark mode */
-body.dark-mode .navbar-toggler-icon {
-    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba(255, 255, 255, 0.8)' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e");
-}
+    body.dark-mode .offcanvas {
+        background-color: var(--navbar-bg-dark-theme);
+        color: var(--navbar-text-dark-theme);
+    }
 
-body.dark-mode .balance-zero {
-    color: var(--text-muted-dark-theme);
-}
+    body.dark-mode .offcanvas .offcanvas-header {
+        border-bottom-color: rgba(255, 255, 255, 0.2);
+    }
 
-body.dark-mode .offcanvas {
-    background-color: var(--navbar-bg-dark-theme);
-    color: var(--navbar-text-dark-theme);
-}
+    body.dark-mode .offcanvas .nav-link {
+        color: var(--navbar-text-dark-theme);
+    }
 
-body.dark-mode .offcanvas .offcanvas-header {
-    border-bottom-color: rgba(255, 255, 255, 0.2);
-}
+    body.dark-mode .offcanvas .nav-link:hover,
+    body.dark-mode .offcanvas .nav-link.active {
+        color: #fff;
+        background-color: rgba(255, 255, 255, 0.15);
+    }
 
-body.dark-mode .offcanvas .nav-link {
-    color: var(--navbar-text-dark-theme);
-}
+    body.dark-mode .form-control,
+    body.dark-mode .form-select {
+        background-color: #333;
+        /* Fundo mais escuro para inputs */
+        color: var(--text-dark-theme);
+        border-color: var(--card-border-dark-theme);
+    }
 
-body.dark-mode .offcanvas .nav-link:hover,
-body.dark-mode .offcanvas .nav-link.active {
-    color: #fff;
-    background-color: rgba(255, 255, 255, 0.15);
-}
+    body.dark-mode .form-control:focus,
+    body.dark-mode .form-select:focus {
+        background-color: #444;
+        color: var(--text-dark-theme);
+        border-color: var(--primary);
+        /* Mantém borda primária no foco */
+        box-shadow: 0 0 0 0.25rem rgba(var(--bs-primary-rgb), .35);
+    }
 
-body.dark-mode .form-control,
-body.dark-mode .form-select {
-    background-color: #333;
-    /* Fundo mais escuro para inputs */
-    color: var(--text-dark-theme);
-    border-color: var(--card-border-dark-theme);
-}
+    body.dark-mode .form-control::placeholder {
+        color: var(--text-muted-dark-theme);
+        opacity: 0.7;
+    }
 
-body.dark-mode .form-control:focus,
-body.dark-mode .form-select:focus {
-    background-color: #444;
-    color: var(--text-dark-theme);
-    border-color: var(--primary);
-    /* Mantém borda primária no foco */
-    box-shadow: 0 0 0 0.25rem rgba(var(--bs-primary-rgb), .35);
-}
+    body.dark-mode .modal-content {
+        background-color: var(--card-bg-dark-theme);
+        color: var(--text-dark-theme);
+    }
 
-body.dark-mode .form-control::placeholder {
-    color: var(--text-muted-dark-theme);
-    opacity: 0.7;
-}
+    body.dark-mode .modal-header {
+        border-bottom-color: var(--card-border-dark-theme);
+    }
 
-body.dark-mode .modal-content {
-    background-color: var(--card-bg-dark-theme);
-    color: var(--text-dark-theme);
-}
+    body.dark-mode .modal-footer {
+        border-top-color: var(--card-border-dark-theme);
+    }
 
-body.dark-mode .modal-header {
-    border-bottom-color: var(--card-border-dark-theme);
-}
-
-body.dark-mode .modal-footer {
-    border-top-color: var(--card-border-dark-theme);
-}
-
-body.dark-mode .btn-close {
-    filter: invert(1) grayscale(100%) brightness(200%);
-}
+    body.dark-mode .btn-close {
+        filter: invert(1) grayscale(100%) brightness(200%);
+    }
 
 
-body.dark-mode .list-group-item {
-    background-color: transparent;
-    /* Fundo do item da lista */
-    border-color: var(--card-border-dark-theme);
-    /* Borda do item */
-    color: var(--text-dark-theme);
-    /* Cor do texto */
-}
+    body.dark-mode .list-group-item {
+        background-color: transparent;
+        /* Fundo do item da lista */
+        border-color: var(--card-border-dark-theme);
+        /* Borda do item */
+        color: var(--text-dark-theme);
+        /* Cor do texto */
+    }
 
-body.dark-mode .list-group-item.bg-light {
-    /* Ajusta o item destacado */
-    background-color: rgba(255, 255, 255, 0.08) !important;
-}
+    body.dark-mode .list-group-item.bg-light {
+        /* Ajusta o item destacado */
+        background-color: rgba(255, 255, 255, 0.08) !important;
+    }
 
-body.dark-mode .table {
-    color: var(--text-dark-theme);
-    border-color: var(--card-border-dark-theme);
-}
+    body.dark-mode .table {
+        color: var(--text-dark-theme);
+        border-color: var(--card-border-dark-theme);
+    }
 
-body.dark-mode .table th, body.dark-mode .table td {
-    border-color: var(--card-border-dark-theme);
-    /* Borda interna da tabela */
-}
+    body.dark-mode .table th, body.dark-mode .table td {
+        border-color: var(--card-border-dark-theme);
+        /* Borda interna da tabela */
+    }
 
-body.dark-mode .table-striped>tbody>tr:nth-of-type(odd)>* {
-    --bs-table-accent-bg: rgba(255, 255, 255, 0.04);
-    /* Cor da linha zebrada */
-    color: var(--text-dark-theme);
-}
+    body.dark-mode .table-striped>tbody>tr:nth-of-type(odd)>* {
+        --bs-table-accent-bg: rgba(255, 255, 255, 0.04);
+        /* Cor da linha zebrada */
+        color: var(--text-dark-theme);
+    }
 
-body.dark-mode .table-hover>tbody>tr:hover>* {
-    background-color: rgba(255, 255, 255, 0.08);
-    /* Fundo hover linha */
-    color: var(--text-dark-theme);
-}
+    body.dark-mode .table-hover>tbody>tr:hover>* {
+        background-color: rgba(255, 255, 255, 0.08);
+        /* Fundo hover linha */
+        color: var(--text-dark-theme);
+    }
 
-/* Ajuste Select2 Dark Mode (pode precisar de mais refinamento) */
-body.dark-mode .select2-container--default .select2-selection--single {
-    background-color: #333;
-    border-color: var(--card-border-dark-theme);
-    color: var(--text-dark-theme);
-}
+    /* Ajuste Select2 Dark Mode (pode precisar de mais refinamento) */
+    body.dark-mode .select2-container--default .select2-selection--single {
+        background-color: #333;
+        border-color: var(--card-border-dark-theme);
+        color: var(--text-dark-theme);
+    }
 
-body.dark-mode .select2-container--default .select2-selection--single .select2-selection__rendered {
-    color: var(--text-dark-theme);
-}
+    body.dark-mode .select2-container--default .select2-selection--single .select2-selection__rendered {
+        color: var(--text-dark-theme);
+    }
 
-body.dark-mode .select2-container--default .select2-selection--single .select2-selection__arrow b {
-    border-color: #bbb transparent transparent transparent;
-}
+    body.dark-mode .select2-container--default .select2-selection--single .select2-selection__arrow b {
+        border-color: #bbb transparent transparent transparent;
+    }
 
-body.dark-mode .select2-dropdown {
-    background-color: var(--card-bg-dark-theme);
-    border-color: var(--card-border-dark-theme);
-}
+    body.dark-mode .select2-dropdown {
+        background-color: var(--card-bg-dark-theme);
+        border-color: var(--card-border-dark-theme);
+    }
 
-body.dark-mode .select2-container--default .select2-results__option--highlighted[aria-selected] {
-    background-color: var(--primary);
-    color: #fff;
-}
+    body.dark-mode .select2-container--default .select2-results__option--highlighted[aria-selected] {
+        background-color: var(--primary);
+        color: #fff;
+    }
 
-body.dark-mode .select2-results__option[aria-selected=true] {
-    background-color: #555;
-}
+    body.dark-mode .select2-results__option[aria-selected=true] {
+        background-color: #555;
+    }
 
-body.dark-mode .select2-search--dropdown .select2-search__field {
-    background-color: #444;
-    color: var(--text-dark-theme);
-    border-color: var(--card-border-dark-theme);
-}
+    body.dark-mode .select2-search--dropdown .select2-search__field {
+        background-color: #444;
+        color: var(--text-dark-theme);
+        border-color: var(--card-border-dark-theme);
+    }
 
-/* ===== FIM DARK MODE ===== */
+    /* ===== FIM DARK MODE ===== */
