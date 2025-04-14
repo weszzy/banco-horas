@@ -15,7 +15,8 @@ const app = express();
 // Lista de origens permitidas
 const allowedOriginsFromEnv = process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : [];
 const allowedOrigins = [
-    ...allowedOriginsFromEnv, // Inclui origens do .env (ex: seu frontend web se hospedado separadamente)
+    ...allowedOriginsFromEnv,
+    ' https://banco-horas-app.onrender.com', // Inclui origens do .env (ex: seu frontend web se hospedado separadamente)
     'http://localhost',        // Origem padrão da WebView Android Capacitor
     'capacitor://localhost'    // Origem padrão da WebView iOS Capacitor
     // Adicione aqui esquemas customizados se você definir um no capacitor.config.json
