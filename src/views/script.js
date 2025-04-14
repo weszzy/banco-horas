@@ -844,81 +844,110 @@ class PontoApp {
   // --- Lógica de Autenticação ---
   /** Manipula o envio do formulário de login. */
   async handleLogin() {
-    console.log("Handling login logic..."); const loginModal = this.ui.loginModal;
-    if (!loginModal) { console.error("Login Modal not initialized."); return; } const loginForm = this.ui.loginModalElement?.querySelector('#loginForm');
-    const btnSubmit = this.ui.loginModalElement?.querySelector('#btnLoginSubmit'); const loginError = this.ui.loginModalElement?.querySelector('#loginError');
-    if (!loginForm || !btnSubmit || !loginError) { console.error("Elementos internos login modal não encontrados."); return; }
-    const email = loginForm.email.value; const password = loginForm.password.value; loginError.style.display = 'none';
-    if (!email || !password) {
-      loginError.textContent = 'E-mail/senha obrigatórios.'; loginError.style.display = 'block';
+    console.log("Handling login logic...");
+
+// Obter a instância do modal AQUI usando _ensureModalInstance ---
+    const modalInstance = this._ensureModalInstance('loginModal'); // Usa a função helper
+    if (!modalInstance) { // Verifica se a obtenção/criação da instância falhou
+      console.error("Login Modal could not be initialized or found.");
+      // Tenta mostrar um alerta geral se a instância não pôde ser criada
+      this.showAlert('danger', 'Erro ao inicializar o formulário de login.');
       return;
-    } btnSubmit.disabled = true; btnSubmit.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Entrando...';
+    }
 
+    // Pega os elementos internos a partir do elemento DOM cacheado
+    const loginForm = this.ui.loginModalElement?.querySelector('#loginForm');
+    const btnSubmit = this.ui.loginModalElement?.querySelector('#btnLoginSubmit');
+    const loginError = this.ui.loginModalElement?.querySelector('#loginError');
 
-    // --- INÍCIO: Lógica de Indicador de Loading/Aquecimento ---
+    // Verifica se elementos internos existem (boa prática)
+    if (!loginForm || !btnSubmit || !loginError) {
+      console.error("Elementos internos do modal de login não encontrados.");
+      modalInstance.hide(); // Fecha o modal se estiver quebrado
+      this.showAlert('danger', 'Erro interno no formulário de login.');
+      return;
+    }
+
+    // Pega os valores do formulário
+    const email = loginForm.email.value;
+    const password = loginForm.password.value;
+    loginError.style.display = 'none'; // Limpa erros anteriores
+
+    // Validação básica de entrada
+    if (!email || !password) {
+      loginError.textContent = 'E-mail e senha são obrigatórios.';
+      loginError.style.display = 'block';
+      return;
+    }
+
+    // --- Lógica de Indicador de Loading/Aquecimento ---
     btnSubmit.disabled = true;
-    // Mudar o texto para indicar que está conectando/aquecendo
     btnSubmit.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span> Conectando...';
-    // this.showAlert('info', 'Conectando ao servidor... Isso pode levar alguns segundos.', 15000); // Mostra por 15s ou até ser fechado
-    // Opcional: Adicionar um timeout MÁXIMO para a requisição de login
-    const loginTimeoutMillis = 30000; // Ex: 30 segundos
+
+    const loginTimeoutMillis = 30000; // 30 segundos
     const controller = new AbortController();
     const timeoutId = setTimeout(() => {
       console.warn(`[Login] Timeout de ${loginTimeoutMillis / 1000}s atingido.`);
       controller.abort(); // Cancela a requisição fetch
     }, loginTimeoutMillis);
-    // --- FIM: Lógica de Indicador de Loading/Aquecimento ---
-
-
+    // --- FIM Lógica de Indicador ---
 
     try {
+      // Faz a requisição à API
       const response = await this.fetchWithAuth('/api/auth/login', {
         method: 'POST',
         body: JSON.stringify({ email, password }),
-        signal: controller.signal // Passa o AbortSignal para o fetch
+        signal: controller.signal // Passa o AbortSignal
       });
 
-      clearTimeout(timeoutId); // Cancela o timeout se a resposta chegou a tempo
+      clearTimeout(timeoutId); // Cancela o timeout se a resposta chegou
 
       if (!response) {
-        // fetchWithAuth já tratou 401/erro de rede e rejeitou a promessa
-        // Mas podemos colocar um erro genérico aqui se necessário, embora não deva ser alcançado.
-        throw new Error("Falha na comunicação com o servidor.");
+        // fetchWithAuth já tratou 401/erro de rede e rejeitou
+        throw new Error("Falha na comunicação com o servidor."); // Mensagem genérica caso algo escape
       }
 
       const result = await response.json();
+      // Verifica se a resposta da API indica sucesso (status HTTP ok E success: true no JSON)
       if (!response.ok || !result.success) {
         throw new Error(result.message || `Erro ${response.status}`);
       }
 
       // --- Sucesso ---
+      // Armazena token e dados do usuário
       this.state.token = result.data.token;
       this.state.currentUser = result.data.user;
       localStorage.setItem('authToken', this.state.token);
       localStorage.setItem('currentUser', JSON.stringify(this.state.currentUser));
       console.log("Login successful.");
-      loginModalInstance.hide(); // Usa a instância garantida
+
+
+      modalInstance.hide();
+
+      // Atualiza a interface geral da aplicação
       this._updateView();
 
     } catch (error) {
       clearTimeout(timeoutId); // Limpa timeout em caso de erro também
       console.error("Login failed:", error);
+      // Formata a mensagem de erro
       let errorMessage = `Falha no login: ${error.message}`;
       if (error.name === 'AbortError') {
         errorMessage = "Falha no login: O servidor demorou muito para responder. Tente novamente.";
-        // Poderia adicionar um link para verificar status do serviço?
       } else if (error.message === 'Não autorizado') {
-        errorMessage = "Sessão inválida ou expirada. Faça login novamente."; // Mensagem específica do fetchWithAuth
+        errorMessage = "Sessão inválida ou expirada. Faça login novamente.";
       }
+      // Exibe o erro dentro do modal
       loginError.textContent = errorMessage;
       loginError.style.display = 'block';
+      // Não fecha o modal em caso de erro
 
     } finally {
-      // Garante que o botão seja reabilitado independentemente do resultado
+      // Reabilita o botão SEMPRE, independentemente do resultado
       btnSubmit.disabled = false;
       btnSubmit.innerHTML = 'Entrar';
     }
-  }
+  } // Fim handleLogin
 
 
 
