@@ -13,6 +13,7 @@ const app = express();
 
 
 // Lista de origens permitidas
+const selfOrigin = process.env.RENDER_EXTERNAL_URL || 'https://banco-horas-app.onrender.com';
 const allowedOriginsFromEnv = process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : [];
 const allowedOrigins = [
     ...allowedOriginsFromEnv,
@@ -25,7 +26,6 @@ const allowedOrigins = [
 
 const corsOptions = {
     origin: function (origin, callback) {
-        // `origin` será undefined para requisições 'server-to-server' ou algumas ferramentas (Postman)
         // Permite requisições sem origem OU se a origem está na lista de permissões.
         if (!origin || allowedOrigins.indexOf(origin) !== -1) {
             logger.debug(`[CORS] Permitido acesso para origem: ${origin || 'sem origem'}`);
@@ -35,14 +35,15 @@ const corsOptions = {
             callback(new Error('Not allowed by CORS')); // Bloqueia a requisição
         }
     },
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'], // Métodos permitidos
-    allowedHeaders: ['Content-Type', 'Authorization'], // Cabeçalhos permitidos
-    credentials: true // Permite cookies (se você usar autenticação baseada em sessão/cookie) - Opcional
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true // Opcional
 };
+
 
 app.use(cors(corsOptions)); // Usa as opções configuradas
 logger.info(`Middleware CORS configurado. Origens permitidas via env: ${process.env.ALLOWED_ORIGINS || 'Nenhuma'}. Origens Capacitor adicionadas: http://localhost, capacitor://localhost`);
-
+logger.info(`Middleware CORS configurado. Origens Permitidas: ${allowedOrigins.join(', ')}`);
 
 // --- FIM Middleware CORS ATUALIZADO --
 // --- Configurações de Confiança e Proxy ---
