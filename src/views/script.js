@@ -5,10 +5,9 @@
  */
 
 // --- DEFINIR URL BASE DA API ---
-// Substitua pela URL real do seu backend no Render
-
-const API_BASE_URL = process.env.REACT_APP_API_URL
-console.log(`[Config] API Base URL: ${API_BASE_URL}`);
+const API_BASE_URL = 'https://banco-horas-app.onrender.com'; // 
+console.log(`[Config] API Base URL: ${API_BASE_URL}`); // 
+// --- FIM DEFINIR URL BASE ---
 
 
 class PontoApp {
