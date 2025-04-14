@@ -11,6 +11,39 @@ const { sequelize } = require('./config/database'); // Instância do Sequelize p
 
 const app = express();
 
+
+// Lista de origens permitidas
+const allowedOriginsFromEnv = process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : [];
+const allowedOrigins = [
+    ...allowedOriginsFromEnv, // Inclui origens do .env (ex: seu frontend web se hospedado separadamente)
+    'http://localhost',        // Origem padrão da WebView Android Capacitor
+    'capacitor://localhost'    // Origem padrão da WebView iOS Capacitor
+    // Adicione aqui esquemas customizados se você definir um no capacitor.config.json
+    // Ex: 'app://com.dwdp.bancohoras'
+];
+
+const corsOptions = {
+    origin: function (origin, callback) {
+        // `origin` será undefined para requisições 'server-to-server' ou algumas ferramentas (Postman)
+        // Permite requisições sem origem OU se a origem está na lista de permissões.
+        if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+            logger.debug(`[CORS] Permitido acesso para origem: ${origin || 'sem origem'}`);
+            callback(null, true); // Permite a requisição
+        } else {
+            logger.warn(`[CORS] Bloqueado acesso para origem não permitida: ${origin}`);
+            callback(new Error('Not allowed by CORS')); // Bloqueia a requisição
+        }
+    },
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'], // Métodos permitidos
+    allowedHeaders: ['Content-Type', 'Authorization'], // Cabeçalhos permitidos
+    credentials: true // Permite cookies (se você usar autenticação baseada em sessão/cookie) - Opcional
+};
+
+app.use(cors(corsOptions)); // Usa as opções configuradas
+logger.info(`Middleware CORS configurado. Origens permitidas via env: ${process.env.ALLOWED_ORIGINS || 'Nenhuma'}. Origens Capacitor adicionadas: http://localhost, capacitor://localhost`);
+
+
+// --- FIM Middleware CORS ATUALIZADO --
 // --- Configurações de Confiança e Proxy ---
 // Necessário se a aplicação estiver atrás de um proxy reverso (como Nginx, Heroku, Render)
 // Confia no primeiro proxy na cadeia (identificado pelo cabeçalho X-Forwarded-For)
