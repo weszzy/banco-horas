@@ -22,7 +22,8 @@ const allowedOrigins = [
     selfOrigin,
     ...allowedOriginsFromEnv,
     'http://localhost',
-    'capacitor://localhost'
+    'capacitor://localhost',
+    'https://localhost'
 ];
 
 const corsOptions = {
